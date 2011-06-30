@@ -904,11 +904,11 @@ static int usbhs_enable(struct device *dev)
 		udelay(10);
 
 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
-			gpio_set_value
+			gpio_set_value_cansleep
 				(pdata->ehci_data->reset_gpio_port[0], 1);
 
 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
-			gpio_set_value
+			gpio_set_value_cansleep
 				(pdata->ehci_data->reset_gpio_port[1], 1);
 	}
 

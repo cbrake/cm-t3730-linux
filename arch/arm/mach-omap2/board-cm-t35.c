@@ -347,6 +347,10 @@ static struct regulator_consumer_supply cm_t35_vdac_supply =
 static struct regulator_consumer_supply cm_t35_vdvi_supply =
 	REGULATOR_SUPPLY("vdvi", "omapdss");
 
+static struct regulator_consumer_supply cm_t35_vio_supplies[] = {
+	REGULATOR_SUPPLY("vcc", "spi1.0"),
+};
+
 /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
 static struct regulator_init_data cm_t35_vmmc1 = {
 	.constraints = {
@@ -404,6 +408,19 @@ static struct regulator_init_data cm_t35_vpll2 = {
 	},
 	.num_consumer_supplies	= 1,
 	.consumer_supplies	= &cm_t35_vdvi_supply,
+};
+
+static struct regulator_init_data cm_t35_vio = {
+	.constraints = {
+		.min_uV			= 1800000,
+		.max_uV			= 1800000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_MODE,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(cm_t35_vio_supplies),
+	.consumer_supplies	= cm_t35_vio_supplies,
 };
 
 static struct twl4030_usb_data cm_t35_usb_data = {
@@ -503,6 +520,7 @@ static struct twl4030_platform_data cm_t35_twldata = {
 	.vsim		= &cm_t35_vsim,
 	.vdac		= &cm_t35_vdac,
 	.vpll2		= &cm_t35_vpll2,
+	.vio		= &cm_t35_vio,
 };
 
 static void __init cm_t35_init_i2c(void)

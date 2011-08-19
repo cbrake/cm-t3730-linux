@@ -100,7 +100,8 @@ static int __init overo_soc_init(void)
 {
 	int ret;
 
-	if (!(machine_is_overo() || machine_is_cm_t35())) {
+	if (!(machine_is_overo() ||
+	      machine_is_cm_t35() || machine_is_cm_t3730())) {
 		pr_debug("Incomatible machine!\n");
 		return -ENODEV;
 	}

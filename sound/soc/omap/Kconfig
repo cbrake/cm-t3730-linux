@@ -57,13 +57,13 @@ config SND_OMAP_SOC_OSK5912
 	  Say Y if you want to add support for SoC audio on osk5912.
 
 config SND_OMAP_SOC_OVERO
-	tristate "SoC Audio support for Gumstix Overo and CompuLab CM-T35"
-	depends on TWL4030_CORE && SND_OMAP_SOC && (MACH_OVERO || MACH_CM_T35)
+	tristate "SoC Audio support for Gumstix Overo and CompuLab CM-T35/CM-T3730"
+	depends on TWL4030_CORE && SND_OMAP_SOC && (MACH_OVERO || MACH_CM_T35 || MACH_CM_T3730)
 	select SND_OMAP_SOC_MCBSP
 	select SND_SOC_TWL4030
 	help
 	  Say Y if you want to add support for SoC audio on the
-	  Gumstix Overo or CompuLab CM-T35
+	  Gumstix Overo or CompuLab CM-T35/CM-T3730
 
 config SND_OMAP_SOC_OMAP3EVM
 	tristate "SoC Audio support for OMAP3EVM board"

@@ -21,13 +21,13 @@
 
 #include <linux/clk.h>
 #include <linux/platform_device.h>
+#include <linux/gpio.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
 
 #include <asm/mach-types.h>
 #include <mach/hardware.h>
-#include <mach/gpio.h>
 #include <plat/mcbsp.h>
 
 #include "omap-mcbsp.h"
@@ -119,8 +119,19 @@ static int __init overo_soc_init(void)
 	if (ret)
 		goto err1;
 
+	/* enable audio amplifier on SB-T35 */
+	if (machine_is_cm_t35() || machine_is_cm_t3730()) {
+		ret = gpio_request_one(61, GPIOF_OUT_INIT_LOW, "AMP SHDN");
+		if (ret)
+			goto err2;
+
+		gpio_export(61, 0);
+	}
+
 	return 0;
 
+err2:
+	platform_device_del(overo_snd_device);
 err1:
 	printk(KERN_ERR "Unable to add platform device\n");
 	platform_device_put(overo_snd_device);
@@ -132,6 +143,7 @@ module_init(overo_soc_init);
 static void __exit overo_soc_exit(void)
 {
 	platform_device_unregister(overo_snd_device);
+	gpio_free(61);
 }
 module_exit(overo_soc_exit);
 

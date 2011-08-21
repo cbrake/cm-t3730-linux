@@ -187,7 +187,7 @@ static int cm_t35_panel_enable_lcd(struct omap_dss_device *dssdev)
 		return -EINVAL;
 	}
 
-	gpio_set_value(CM_T35_LCD_EN_GPIO, 1);
+/*	gpio_set_value(CM_T35_LCD_EN_GPIO, 1); */
 	gpio_set_value(CM_T35_LCD_BL_GPIO, 1);
 
 	lcd_enabled = 1;
@@ -200,7 +200,7 @@ static void cm_t35_panel_disable_lcd(struct omap_dss_device *dssdev)
 	lcd_enabled = 0;
 
 	gpio_set_value(CM_T35_LCD_BL_GPIO, 0);
-	gpio_set_value(CM_T35_LCD_EN_GPIO, 0);
+/*	gpio_set_value(CM_T35_LCD_EN_GPIO, 0); */
 }
 
 static int cm_t35_panel_enable_dvi(struct omap_dss_device *dssdev)

@@ -510,6 +510,13 @@ static struct twl4030_gpio_platform_data cm_t35_gpio_data = {
 	.setup          = cm_t35_twl_gpio_setup,
 };
 
+static struct twl4030_codec_audio_data cm_t35_audio_data;
+
+static struct twl4030_codec_data cm_t35_codec_data = {
+	.audio_mclk = 26000000,
+	.audio = &cm_t35_audio_data,
+};
+
 static struct twl4030_platform_data cm_t35_twldata = {
 	.irq_base	= TWL4030_IRQ_BASE,
 	.irq_end	= TWL4030_IRQ_END,
@@ -518,6 +525,7 @@ static struct twl4030_platform_data cm_t35_twldata = {
 	.keypad		= &cm_t35_kp_data,
 	.usb		= &cm_t35_usb_data,
 	.gpio		= &cm_t35_gpio_data,
+	.codec		= &cm_t35_codec_data,
 	.vmmc1		= &cm_t35_vmmc1,
 	.vsim		= &cm_t35_vsim,
 	.vdac		= &cm_t35_vdac,

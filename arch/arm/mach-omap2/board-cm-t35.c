@@ -477,6 +477,23 @@ static void cm_t35_init_usbh(void)
 	usbhs_init(&usbhs_bdata);
 }
 
+/* Backup Battery config register */
+#define BB_CFG_REG     0x12
+/* Charging configuration */
+#define VOLTAGE_3V     0x01
+#define CURRENT_1mA    0x03
+#define CHARGER_EN     0x01
+
+static void __init cm_t35_init_charge(void)
+{
+	int err;
+	u8 reg_val = (CHARGER_EN << 4) | (VOLTAGE_3V << 2) | (CURRENT_1mA);
+
+	err = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, reg_val, BB_CFG_REG);
+	if (err)
+		pr_err("Backup Battery charger init failed: %d\n", err);
+}
+
 static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
 				 unsigned ngpio)
 {
@@ -499,6 +516,8 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
 	/* link regulators to MMC adapters */
 	cm_t35_vmmc1_supply.dev = mmc[0].dev;
 	cm_t35_vsim_supply.dev = mmc[0].dev;
+
+	cm_t35_init_charge();
 
 	return 0;
 }

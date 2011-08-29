@@ -409,9 +409,8 @@ struct musb {
 	struct list_head	control;	/* of musb_qh */
 	struct list_head	in_bulk;	/* of musb_qh */
 	struct list_head	out_bulk;	/* of musb_qh */
-
-	struct timer_list	otg_timer;
 #endif
+	struct timer_list	otg_timer;
 	struct notifier_block	nb;
 
 	struct dma_controller	*dma_controller;

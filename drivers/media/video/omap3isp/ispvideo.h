@@ -52,7 +52,8 @@ struct v4l2_pix_format;
  * @flavor: V4L2 media bus format code for the same pixel layout but
  *	shifted to be 8 bits per pixel. =0 if format is not shiftable.
  * @pixelformat: V4L2 pixel format FCC identifier
- * @bpp: Bits per pixel
+ * @width: Data bus width
+ * @bpp: Bits per pixel (when stored in memory)
  */
 struct isp_format_info {
 	enum v4l2_mbus_pixelcode code;
@@ -60,6 +61,7 @@ struct isp_format_info {
 	enum v4l2_mbus_pixelcode uncompressed;
 	enum v4l2_mbus_pixelcode flavor;
 	u32 pixelformat;
+	unsigned int width;
 	unsigned int bpp;
 };
 

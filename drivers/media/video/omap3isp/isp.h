@@ -234,7 +234,7 @@ int omap3isp_pipeline_set_stream(struct isp_pipeline *pipe,
 void omap3isp_configure_bridge(struct isp_device *isp,
 			       enum ccdc_input_entity input,
 			       const struct isp_parallel_platform_data *pdata,
-			       unsigned int shift);
+			       unsigned int shift, bool bridge);
 
 #define ISP_XCLK_NONE			0
 #define ISP_XCLK_A			1

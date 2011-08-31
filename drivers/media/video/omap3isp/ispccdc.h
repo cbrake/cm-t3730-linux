@@ -47,22 +47,6 @@ enum ccdc_input_entity {
 #define	OMAP3ISP_CCDC_NEVENTS	16
 
 /*
- * struct ispccdc_syncif - Structure for Sync Interface between sensor and CCDC
- * @datsz: Data size.
- * @datapol: 0 - Positive, 1 - Negative.
- * @hdpol: 0 - Positive, 1 - Negative.
- * @vdpol: 0 - Positive, 1 - Negative.
- * @bt_r656_en: 1 - Enable ITU-R BT656 mode, 0 - Sync mode.
- */
-struct ispccdc_syncif {
-	u8 datsz;
-	u8 datapol;
-	u8 hdpol;
-	u8 vdpol;
-	u8 bt_r656_en;
-};
-
-/*
  * struct ispccdc_vp - Structure for Video Port parameters
  * @pixelclk: Input pixel clock in Hz
  */
@@ -143,7 +127,6 @@ struct ispccdc_lsc {
  * @lsc: Lens shading compensation configuration
  * @update: Bitmask of controls to update during the next interrupt
  * @shadow_update: Controls update in progress by userspace
- * @syncif: Interface synchronization configuration
  * @vpcfg: Video port configuration
  * @underrun: A buffer underrun occurred and a new buffer has been queued
  * @state: Streaming state
@@ -173,7 +156,6 @@ struct isp_ccdc_device {
 	unsigned int update;
 	unsigned int shadow_update;
 
-	struct ispccdc_syncif syncif;
 	struct ispccdc_vp vpcfg;
 
 	unsigned int underrun:1;

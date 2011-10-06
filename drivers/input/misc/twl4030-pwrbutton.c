@@ -52,6 +52,16 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 	return IRQ_HANDLED;
 }
 
+static void twl4030_power_off(void)
+{
+	int err;
+
+	err = twl_i2c_write_u8(TWL4030_MODULE_PM_MASTER, 0x1,
+			TWL4030_PM_MASTER_P1_SW_EVENTS);
+	if (err)
+		pr_err("TWL4030 Unable to power off\n");
+}
+
 static int __init twl4030_pwrbutton_probe(struct platform_device *pdev)
 {
 	struct input_dev *pwr;
@@ -85,6 +95,8 @@ static int __init twl4030_pwrbutton_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, pwr);
+
+	pm_power_off = twl4030_power_off;
 
 	return 0;
 

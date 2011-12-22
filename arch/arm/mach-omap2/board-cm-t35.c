@@ -536,6 +536,10 @@ static struct twl4030_codec_data cm_t35_codec_data = {
 	.audio = &cm_t35_audio_data,
 };
 
+static struct twl4030_madc_platform_data cm_t35_madc_data = {
+	.irq_line	= 1,
+};
+
 static struct twl4030_platform_data cm_t35_twldata = {
 	.irq_base	= TWL4030_IRQ_BASE,
 	.irq_end	= TWL4030_IRQ_END,
@@ -549,10 +553,16 @@ static struct twl4030_platform_data cm_t35_twldata = {
 	.vsim		= &cm_t35_vsim,
 	.vdac		= &cm_t35_vdac,
 	.vio		= &cm_t35_vio,
+	.madc		= &cm_t35_madc_data,
+};
+
+static struct platform_device cm_t35_madc_hwmon = {
+	.name	= "twl4030_madc_hwmon",
 };
 
 static void __init cm_t35_init_i2c(void)
 {
+	platform_device_register(&cm_t35_madc_hwmon);
 	omap3_pmic_init("tps65930", &cm_t35_twldata);
 }
 

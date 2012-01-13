@@ -122,6 +122,33 @@ static void __init cm_t35_init_led(void)
 static inline void cm_t35_init_led(void) {}
 #endif
 
+#if defined(CONFIG_TOUCHSCREEN_ADS7846)
+#include <linux/spi/ads7846.h>
+
+static struct ads7846_platform_data cm_t35_ads7846_config __initdata = {
+	.x_max			= 0x0fff,
+	.y_max			= 0x0fff,
+	.x_plate_ohms		= 180,
+	.pressure_max		= 255,
+	.debounce_max		= 30,
+	.debounce_tol		= 10,
+	.debounce_rep		= 1,
+	.keep_vref_on		= 1,
+	.gpio_pendown		= CM_T35_GPIO_PENDOWN,
+	.settle_delay_usecs	= 100,
+};
+
+
+static void __init cm_t35_init_touchscreen(void)
+{
+	omap_ads7846_init(1, CM_T35_GPIO_PENDOWN, 0, &cm_t35_ads7846_config);
+}
+
+#else
+static inline void cm_t35_init_touchscreen(void) {}
+#endif
+
+
 #if defined(CONFIG_MTD_NAND_OMAP2) || defined(CONFIG_MTD_NAND_OMAP2_MODULE)
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
@@ -706,7 +733,7 @@ static void __init cm_t3x_common_init(void)
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
 	omap_serial_init();
 	cm_t35_init_i2c();
-	omap_ads7846_init(1, CM_T35_GPIO_PENDOWN, 0, NULL);
+	cm_t35_init_touchscreen();
 	cm_t35_init_ethernet();
 	cm_t35_init_led();
 	cm_t35_init_display();

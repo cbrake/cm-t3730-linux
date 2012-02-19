@@ -19,6 +19,7 @@ struct omap_smsc911x_platform_data {
 	int	gpio_irq;
 	int	gpio_reset;
 	u32	flags;
+	unsigned char mac[6];
 };
 
 #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)

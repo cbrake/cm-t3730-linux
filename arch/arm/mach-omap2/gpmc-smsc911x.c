@@ -47,7 +47,7 @@ static struct smsc911x_platform_config gpmc_smsc911x_config = {
  * assume that pin multiplexing is done in the board-*.c file,
  * or in the bootloader.
  */
-void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+void gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
 {
 	struct platform_device *pdev;
 	unsigned long cs_mem_base;

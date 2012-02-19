@@ -80,13 +80,27 @@ static struct omap_smsc911x_platform_data sb_t35_smsc911x_cfg = {
 	.flags		= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
 };
 
-static void __init cm_t35_init_ethernet(void)
+#define EEPROM_1ST_MAC_OFF	4
+
+static void __init cm_t35_init_ethernet(struct memory_accessor *mem_acc)
 {
+	ssize_t ret;
+
+	ret = mem_acc->read(mem_acc, cm_t35_smsc911x_cfg.mac,
+			    EEPROM_1ST_MAC_OFF, ETH_ALEN);
+	if (ret != ETH_ALEN)
+		pr_warning("CM-T35: failed to read MAC address from EEPROM\n");
+
 	gpmc_smsc911x_init(&cm_t35_smsc911x_cfg);
+}
+
+static void __init sb_t35_init_ethernet(void)
+{
 	gpmc_smsc911x_init(&sb_t35_smsc911x_cfg);
 }
 #else
-static inline void __init cm_t35_init_ethernet(void) { return; }
+static inline void cm_t35_init_ethernet(struct memory_accessor *mem_acc) {}
+static inline void sb_t35_init_ethernet(void) {}
 #endif
 
 #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
@@ -587,10 +601,36 @@ static struct platform_device cm_t35_madc_hwmon = {
 	.name	= "twl4030_madc_hwmon",
 };
 
+static void cm_t35_eeprom_setup(struct memory_accessor *mem_acc, void *context)
+{
+	cm_t35_init_ethernet(mem_acc);
+
+	/* TODO: this should be called in a sb_t35_eeprom_setup() */
+	sb_t35_init_ethernet();
+}
+
+static struct at24_platform_data cm_t35_eeprom_pdata = {
+	.byte_len	= 256,
+	.page_size	= 16,
+	.setup		= cm_t35_eeprom_setup,
+};
+
+static struct i2c_board_info cm_t35_i2c1_eeprom_info __initdata = {
+	I2C_BOARD_INFO("at24", 0x50),
+	.platform_data = &cm_t35_eeprom_pdata,
+};
+
 static void __init cm_t35_init_i2c(void)
 {
+	int err;
+
 	platform_device_register(&cm_t35_madc_hwmon);
-	omap3_pmic_init("tps65930", &cm_t35_twldata);
+
+	err = i2c_register_board_info(1, &cm_t35_i2c1_eeprom_info, 1);
+	if (err)
+		pr_err("CM-T35: failed registering EEPROM: %d\n", err);
+
+	omap_pmic_init(1, 400, "tps65930", INT_34XX_SYS_NIRQ, &cm_t35_twldata);
 }
 
 static void __init cm_t35_init_early(void)
@@ -742,7 +782,6 @@ static void __init cm_t3x_common_init(void)
 	omap_serial_init();
 	cm_t35_init_i2c();
 	cm_t35_init_touchscreen();
-	cm_t35_init_ethernet();
 	cm_t35_init_led();
 	cm_t35_init_display();
 

@@ -624,7 +624,9 @@ static void __init cm_t35_init_i2c(void)
 {
 	int err;
 
-	platform_device_register(&cm_t35_madc_hwmon);
+	err = platform_device_register(&cm_t35_madc_hwmon);
+	if (err)
+		pr_err("CM-T35: failed registering MADC HWMON: %d\n", err);
 
 	err = i2c_register_board_info(1, &cm_t35_i2c1_eeprom_info, 1);
 	if (err)

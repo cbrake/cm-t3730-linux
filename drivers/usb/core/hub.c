@@ -1297,6 +1297,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	desc = intf->cur_altsetting;
 	hdev = interface_to_usbdev(intf);
 
+#ifndef CONFIG_ARCH_OMAP3
 	/* Hubs have proper suspend/resume support.  USB 3.0 device suspend is
 	 * different from USB 2.0/1.1 device suspend, and unfortunately we
 	 * don't support it yet.  So leave autosuspend disabled for USB 3.0
@@ -1305,6 +1306,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	 */
 	if (!hub_is_superspeed(hdev) || !hdev->parent)
 		usb_enable_autosuspend(hdev);
+#endif
 
 	if (hdev->level == MAX_TOPO_LEVEL) {
 		dev_err(&intf->dev,

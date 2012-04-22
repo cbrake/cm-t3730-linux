@@ -1223,7 +1223,12 @@ static void preview_print_status(struct isp_prev_device *prev)
 static void preview_init_params(struct isp_prev_device *prev)
 {
 	struct prev_params *params = &prev->params;
+	struct isp_device *isp = to_isp_device(prev);
+	struct isp_wbal_pdata *wbal = NULL;
 	int i = 0;
+
+	if (isp->pdata && isp->pdata->subdevs && isp->pdata->subdevs->wbal)
+		wbal = isp->pdata->subdevs->wbal;
 
 	/* Init values */
 	params->contrast = ISPPRV_CONTRAST_DEF * ISPPRV_CONTRAST_UNITS;
@@ -1247,11 +1252,13 @@ static void preview_init_params(struct isp_prev_device *prev)
 	memcpy(params->gamma.blue, gamma_table, sizeof(params->gamma.blue));
 	memcpy(params->gamma.green, gamma_table, sizeof(params->gamma.green));
 	memcpy(params->gamma.red, gamma_table, sizeof(params->gamma.red));
-	params->wbal.dgain = FLR_WBAL_DGAIN;
-	params->wbal.coef0 = FLR_WBAL_COEF;
-	params->wbal.coef1 = FLR_WBAL_COEF;
-	params->wbal.coef2 = FLR_WBAL_COEF;
-	params->wbal.coef3 = FLR_WBAL_COEF;
+
+	params->wbal.dgain = wbal ? wbal->dgain : FLR_WBAL_DGAIN;
+	params->wbal.coef0 = wbal ? wbal->coef0 : FLR_WBAL_COEF;
+	params->wbal.coef1 = wbal ? wbal->coef1 : FLR_WBAL_COEF;
+	params->wbal.coef2 = wbal ? wbal->coef2 : FLR_WBAL_COEF;
+	params->wbal.coef3 = wbal ? wbal->coef3 : FLR_WBAL_COEF;
+
 	params->blk_adj.red = FLR_BLKADJ_RED;
 	params->blk_adj.green = FLR_BLKADJ_GREEN;
 	params->blk_adj.blue = FLR_BLKADJ_BLUE;

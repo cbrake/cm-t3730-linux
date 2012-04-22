@@ -162,7 +162,6 @@ static void __init cm_t35_init_touchscreen(void)
 static inline void cm_t35_init_touchscreen(void) {}
 #endif
 
-
 #if defined(CONFIG_MTD_NAND_OMAP2) || defined(CONFIG_MTD_NAND_OMAP2_MODULE)
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
@@ -633,6 +632,8 @@ static void __init cm_t35_init_i2c(void)
 		pr_err("CM-T35: failed registering EEPROM: %d\n", err);
 
 	omap_pmic_init(1, 400, "tps65930", INT_34XX_SYS_NIRQ, &cm_t35_twldata);
+
+	omap_register_i2c_bus(3, 400, NULL, 0);
 }
 
 static void __init cm_t35_init_early(void)
@@ -729,6 +730,10 @@ static struct omap_board_mux board_mux[] __initdata = {
 	/* I2C1 */
 	OMAP3_MUX(I2C1_SCL, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
 	OMAP3_MUX(I2C1_SDA, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
+
+	/* I2C3 */
+	OMAP3_MUX(I2C3_SCL, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
+	OMAP3_MUX(I2C3_SCL, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
 
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };

@@ -51,6 +51,7 @@
 #include "sdram-micron-mt46h32m32lf-6.h"
 #include "hsmmc.h"
 #include "common-board-devices.h"
+#include "devices.h"
 
 #define CM_T35_GPIO_PENDOWN		57
 #define SB_T35_USB_HUB_RESET_GPIO	167
@@ -619,6 +620,63 @@ static struct i2c_board_info cm_t35_i2c1_eeprom_info __initdata = {
 	.platform_data = &cm_t35_eeprom_pdata,
 };
 
+static struct i2c_board_info cm_t35_i2c3_boardinfo[] = {
+#if defined(CONFIG_VIDEO_MT9T001) || defined(CONFIG_VIDEO_MT9T001_MODULE)
+	{
+		I2C_BOARD_INFO("mt9t001", 0x5d),
+	},
+#endif
+};
+
+#if defined(CONFIG_VIDEO_MT9T001) || defined(CONFIG_VIDEO_MT9T001_MODULE)
+#include "../../../drivers/media/video/omap3isp/isp.h"
+
+static struct isp_subdev_i2c_board_info cm_t35_isp_primary_subdevs[] = {
+	{
+		.board_info = &cm_t35_i2c3_boardinfo[0],
+		.i2c_adapter_id = 3,
+	},
+	{ NULL, 0, },
+};
+
+static struct isp_wbal_pdata cm_t35_isp_mt9t001_wbal = {
+	.dgain = 0x200,
+	.coef0 = 0x1C,
+	.coef1 = 0x1C,
+	.coef2 = 0x2C,
+	.coef3 = 0x1C,
+};
+
+static struct isp_v4l2_subdevs_group cm_t35_isp_mt9t001_subdevs[] = {
+	{
+		.subdevs = cm_t35_isp_primary_subdevs,
+		.wbal = &cm_t35_isp_mt9t001_wbal,
+		.interface = ISP_INTERFACE_PARALLEL,
+		.bus = {
+			.parallel = {
+				.data_lane_shift = 0,
+				.clk_pol	 = 1,
+				.bridge		 = ISPCTRL_PAR_BRIDGE_DISABLE,
+			},
+		},
+	},
+	{ NULL, 0, },
+};
+
+static struct isp_platform_data cm_t35_isp_pdata = {
+	.subdevs = cm_t35_isp_mt9t001_subdevs,
+};
+
+static void __init cm_t35_init_camera(void)
+{
+	if (omap3_init_camera(&cm_t35_isp_pdata) < 0)
+		pr_warning("CM-T35: Failed registering camera device!\n");
+}
+
+#else
+static inline void cm_t35_init_camera(void) {}
+#endif /* CONFIG_VIDEO_MT9T001 */
+
 static void __init cm_t35_init_i2c(void)
 {
 	int err;
@@ -718,6 +776,27 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP3_MUX(DSS_DATA16, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
 	OMAP3_MUX(DSS_DATA17, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
 
+	/* Camera */
+	OMAP3_MUX(CAM_HS, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_VS, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_XCLKA, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_PCLK, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_FLD, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D0, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D2, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D3, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D4, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D5, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D6, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D7, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+	OMAP3_MUX(CAM_D8, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN),
+	OMAP3_MUX(CAM_D9, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN),
+	OMAP3_MUX(CAM_STROBE, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+
+	OMAP3_MUX(CAM_D10, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN),
+	OMAP3_MUX(CAM_D11, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN),
+
 	/* display controls */
 	OMAP3_MUX(MCBSP1_FSR, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
 	OMAP3_MUX(GPMC_NCS7, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
@@ -794,6 +873,7 @@ static void __init cm_t3x_common_init(void)
 
 	usb_musb_init(NULL);
 	cm_t35_init_usbh();
+	cm_t35_init_camera();
 }
 
 static void __init cm_t35_init(void)

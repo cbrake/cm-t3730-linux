@@ -185,8 +185,17 @@ struct isp_subdev_i2c_board_info {
 	int i2c_adapter_id;
 };
 
+struct isp_wbal_pdata {
+	u16 dgain;
+	u8 coef0;
+	u8 coef1;
+	u8 coef2;
+	u8 coef3;
+};
+
 struct isp_v4l2_subdevs_group {
 	struct isp_subdev_i2c_board_info *subdevs;
+	struct isp_wbal_pdata *wbal;
 	enum isp_interface_type interface;
 	union {
 		struct isp_parallel_platform_data parallel;

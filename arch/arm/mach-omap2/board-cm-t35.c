@@ -870,6 +870,7 @@ static void __init cm_t3x_common_init(void)
 	cm_t35_init_touchscreen();
 	cm_t35_init_led();
 	cm_t35_init_display();
+	cm_t35_init_nand();
 
 	usb_musb_init(NULL);
 	cm_t35_init_usbh();
@@ -880,7 +881,6 @@ static void __init cm_t35_init(void)
 {
 	cm_t3x_common_init();
 	cm_t35_init_mux();
-	cm_t35_init_nand();
 }
 
 static void __init cm_t3730_init(void)

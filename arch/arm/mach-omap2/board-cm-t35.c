@@ -620,16 +620,16 @@ static struct i2c_board_info cm_t35_i2c1_eeprom_info __initdata = {
 	.platform_data = &cm_t35_eeprom_pdata,
 };
 
-static struct i2c_board_info cm_t35_i2c3_boardinfo[] = {
+#if defined(CONFIG_VIDEO_OMAP3) || defined(CONFIG_VIDEO_OMAP3_MODULE)
+#include "../../../drivers/media/video/omap3isp/isp.h"
+
 #if defined(CONFIG_VIDEO_MT9T001) || defined(CONFIG_VIDEO_MT9T001_MODULE)
+static struct i2c_board_info cm_t35_i2c3_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("mt9t001", 0x5d),
 	},
-#endif
 };
-
-#if defined(CONFIG_VIDEO_MT9T001) || defined(CONFIG_VIDEO_MT9T001_MODULE)
-#include "../../../drivers/media/video/omap3isp/isp.h"
+#endif /* CONFIG_VIDEO_MT9T001 */
 
 static struct isp_subdev_i2c_board_info cm_t35_isp_primary_subdevs[] = {
 	{
@@ -675,7 +675,7 @@ static void __init cm_t35_init_camera(void)
 
 #else
 static inline void cm_t35_init_camera(void) {}
-#endif /* CONFIG_VIDEO_MT9T001 */
+#endif /* CONFIG_VIDEO_OMAP3 */
 
 static void __init cm_t35_init_i2c(void)
 {

@@ -502,6 +502,27 @@ static void __init cm_t35_init_usbh(void)
 	usbhs_init(&usbhs_bdata);
 }
 
+#if defined(CONFIG_LIBERTAS_SDIO) || defined(CONFIG_LIBERTAS_SDIO_MODULE)
+static void cm_t35_init_wlan(unsigned gpio)
+{
+	int err;
+
+	err = gpio_request_one(gpio, GPIOF_OUT_INIT_HIGH, "wlan rst");
+	if (err) {
+		pr_err("CM-T3x: WiFi reset gpio request failed: %d\n", err);
+		return;
+	}
+	gpio_export(gpio, 0);
+
+	udelay(10);
+	gpio_set_value_cansleep(gpio, 0);
+	udelay(10);
+	gpio_set_value_cansleep(gpio, 1);
+}
+#else
+static inline void cm_t35_init_wlan(unsigned gpio) {}
+#endif /* CONFIG_LIBERTAS_SDIO */
+
 /* Backup Battery config register */
 #define BB_CFG_REG     0x12
 /* Charging configuration */
@@ -519,21 +540,8 @@ static void __init cm_t35_init_charge(void)
 		pr_err("Backup Battery charger init failed: %d\n", err);
 }
 
-static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
-				 unsigned ngpio)
+static int cm_t3x_twl_gpio_setup(unsigned gpio)
 {
-	int wlan_rst = gpio + 2;
-
-	if (gpio_request_one(wlan_rst, GPIOF_OUT_INIT_HIGH, "WLAN RST") == 0) {
-		gpio_export(wlan_rst, 0);
-		udelay(10);
-		gpio_set_value_cansleep(wlan_rst, 0);
-		udelay(10);
-		gpio_set_value_cansleep(wlan_rst, 1);
-	} else {
-		pr_err("CM-T35: could not obtain gpio for WiFi reset\n");
-	}
-
 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
 	mmc[0].gpio_cd = gpio + 0;
 	omap2_hsmmc_init(mmc);
@@ -541,6 +549,13 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
 	cm_t35_init_charge();
 
 	return 0;
+}
+
+static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
+				 unsigned ngpio)
+{
+	cm_t35_init_wlan(gpio + 2);
+	return cm_t3x_twl_gpio_setup(gpio);
 }
 
 static struct twl4030_gpio_platform_data cm_t35_gpio_data = {

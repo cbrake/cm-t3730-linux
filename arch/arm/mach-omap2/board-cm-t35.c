@@ -379,13 +379,8 @@ static void __init cm_t35_init_display(void)
 	}
 }
 
-static struct regulator_consumer_supply cm_t35_vmmc1_supply = {
-	.supply			= "vmmc",
-};
-
-static struct regulator_consumer_supply cm_t35_vsim_supply = {
-	.supply			= "vmmc_aux",
-};
+static struct regulator_consumer_supply cm_t35_vmmc1_supply =
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0");
 
 static struct regulator_consumer_supply cm_t35_vdac_supply =
 	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc");
@@ -409,21 +404,6 @@ static struct regulator_init_data cm_t35_vmmc1 = {
 	},
 	.num_consumer_supplies	= 1,
 	.consumer_supplies	= &cm_t35_vmmc1_supply,
-};
-
-/* VSIM for MMC1 pins DAT4..DAT7 (2 mA, plus card == max 50 mA) */
-static struct regulator_init_data cm_t35_vsim = {
-	.constraints = {
-		.min_uV			= 1800000,
-		.max_uV			= 3000000,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
-					| REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-	},
-	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &cm_t35_vsim_supply,
 };
 
 /* VDAC for DSS driving S-Video (8 mA unloaded, max 65 mA) */
@@ -558,10 +538,6 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
 	mmc[0].gpio_cd = gpio + 0;
 	omap2_hsmmc_init(mmc);
 
-	/* link regulators to MMC adapters */
-	cm_t35_vmmc1_supply.dev = mmc[0].dev;
-	cm_t35_vsim_supply.dev = mmc[0].dev;
-
 	cm_t35_init_charge();
 
 	return 0;
@@ -595,7 +571,6 @@ static struct twl4030_platform_data cm_t35_twldata = {
 	.gpio		= &cm_t35_gpio_data,
 	.codec		= &cm_t35_codec_data,
 	.vmmc1		= &cm_t35_vmmc1,
-	.vsim		= &cm_t35_vsim,
 	.vdac		= &cm_t35_vdac,
 	.vio		= &cm_t35_vio,
 	.madc		= &cm_t35_madc_data,

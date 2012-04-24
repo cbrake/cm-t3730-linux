@@ -23,9 +23,11 @@
 #include <linux/input/matrix_keypad.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
+#include <linux/wl12xx.h>
 
 #include <linux/i2c/at24.h>
 #include <linux/i2c/twl.h>
+#include <linux/regulator/fixed.h>
 #include <linux/regulator/machine.h>
 #include <linux/mmc/host.h>
 
@@ -468,7 +470,6 @@ static struct omap2_hsmmc_info mmc[] = {
 		.caps		= MMC_CAP_4_BIT_DATA,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
-		.ocr_mask	= 0x00100000,	/* 3.3V */
 		.nonremovable	= true,
 	},
 	{}	/* Terminator */
@@ -514,6 +515,7 @@ static void cm_t35_init_wlan(unsigned gpio)
 	}
 	gpio_export(gpio, 0);
 
+	mmc[1].ocr_mask = MMC_VDD_32_33;
 	udelay(10);
 	gpio_set_value_cansleep(gpio, 0);
 	udelay(10);
@@ -522,6 +524,95 @@ static void cm_t35_init_wlan(unsigned gpio)
 #else
 static inline void cm_t35_init_wlan(unsigned gpio) {}
 #endif /* CONFIG_LIBERTAS_SDIO */
+
+#if defined(CONFIG_WL12XX_SDIO) || defined(CONFIG_WL12XX_SDIO_MODULE)
+#define CM_T3730_WLAN_IRQ	136
+#define CM_T3730_WLAN_EN	73
+
+static void __init cm_t3730_init_wlan_mux(void)
+{
+	omap_mux_init_gpio(CM_T3730_WLAN_IRQ, OMAP_MUX_MODE4 | OMAP_PIN_INPUT);
+	omap_mux_init_gpio(CM_T3730_WLAN_EN, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT);
+}
+
+static struct wl12xx_platform_data cm_t3730_wlan_pdata = {
+	.irq = OMAP_GPIO_IRQ(CM_T3730_WLAN_IRQ),
+	.board_ref_clock = WL12XX_REFCLOCK_38,
+};
+
+static struct regulator_consumer_supply cm_t3730_vmmc2_supply[] = {
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
+};
+
+/* VMMC2 for the WL12xx combo chip */
+static struct regulator_init_data cm_t3730_vmmc2 = {
+	.constraints = {
+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= 1,
+	.consumer_supplies = cm_t3730_vmmc2_supply,
+};
+
+static struct fixed_voltage_config cm_t3730_vwlan = {
+	.supply_name		= "vwl1271",
+	.microvolts		= 1800000, /* 1.80V */
+	.gpio			= CM_T3730_WLAN_EN,
+	.startup_delay		= 20000, /* 20ms */
+	.enable_high		= 1,
+	.enabled_at_boot	= 0,
+	.init_data		= &cm_t3730_vmmc2,
+};
+
+static struct platform_device cm_t3730_wlan_regulator = {
+	.name		= "reg-fixed-voltage",
+	.id		= 0,
+	.dev = {
+		.platform_data	= &cm_t3730_vwlan,
+	},
+};
+
+static struct gpio cm_t3730_wlan_gpios[] = {
+	{ -EINVAL, GPIOF_OUT_INIT_HIGH, "wlan pwr" },
+	{ CM_T3730_WLAN_IRQ, GPIOF_IN,  "wlan irq" },
+};
+
+static void cm_t3730_init_wlan(unsigned gpio)
+{
+	int err;
+
+	cm_t3730_wlan_gpios[0].gpio = gpio;
+	err = gpio_request_array(cm_t3730_wlan_gpios,
+				 ARRAY_SIZE(cm_t3730_wlan_gpios));
+	if (err) {
+		pr_err("CM-T3730: WLAN irq gpio request failed: %d\n", err);
+		return;
+	}
+	gpio_export(CM_T3730_WLAN_EN, 0);
+
+	err = wl12xx_set_platform_data(&cm_t3730_wlan_pdata);
+	if (err) {
+		pr_err("CM-T3730: wl12xx pdata set failed: %d\n", err);
+		goto gpio_free;
+	}
+
+	err = platform_device_register(&cm_t3730_wlan_regulator);
+	if (err) {
+		pr_err("CM-T3730: WLAN EN regulator register failed:%d\n", err);
+		goto gpio_free;
+	}
+
+	mmc[1].name = "wl1271";
+	mmc[1].caps |= MMC_CAP_POWER_OFF_CARD;
+
+	return;
+
+gpio_free:
+	gpio_free_array(cm_t3730_wlan_gpios, ARRAY_SIZE(cm_t3730_wlan_gpios));
+}
+#else
+static inline void cm_t3730_init_wlan_mux(void) {}
+static inline void cm_t3730_init_wlan(unsigned gpio) {}
+#endif /* CONFIG_WL12XX_SDIO */
 
 /* Backup Battery config register */
 #define BB_CFG_REG     0x12
@@ -558,11 +649,17 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
 	return cm_t3x_twl_gpio_setup(gpio);
 }
 
+static int cm_t3730_twl_gpio_setup(struct device *dev, unsigned gpio,
+				   unsigned ngpio)
+{
+	cm_t3730_init_wlan(gpio + 2);
+	return cm_t3x_twl_gpio_setup(gpio);
+}
+
 static struct twl4030_gpio_platform_data cm_t35_gpio_data = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
 	.irq_end	= TWL4030_GPIO_IRQ_END,
-	.setup          = cm_t35_twl_gpio_setup,
 };
 
 static struct twl4030_codec_audio_data cm_t35_audio_data;
@@ -894,12 +991,20 @@ static void __init cm_t35_init(void)
 {
 	cm_t3x_common_init();
 	cm_t35_init_mux();
+	cm_t35_gpio_data.setup = cm_t35_twl_gpio_setup;
 }
 
 static void __init cm_t3730_init(void)
 {
 	cm_t3x_common_init();
 	cm_t3730_init_mux();
+
+	if ((system_rev & 0xffff) < 120) {
+		cm_t35_gpio_data.setup = cm_t35_twl_gpio_setup;
+	} else {
+		cm_t35_gpio_data.setup = cm_t3730_twl_gpio_setup;
+		cm_t3730_init_wlan_mux();
+	}
 }
 
 MACHINE_START(CM_T35, "Compulab CM-T35")

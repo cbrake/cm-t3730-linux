@@ -3,6 +3,7 @@
 
 struct mt9t001_platform_data {
 	unsigned int clk_pol:1;
+	void (*custom_setup)(struct i2c_client *);
 };
 
 #endif

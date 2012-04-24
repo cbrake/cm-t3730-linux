@@ -675,6 +675,9 @@ static int mt9t001_video_probe(struct i2c_client *client)
 	s32 data;
 	int ret;
 
+	if (pdata && pdata->custom_setup)
+		pdata->custom_setup(client);
+
 	dev_info(&client->dev, "Probing MT9T001 at address 0x%02x\n",
 		 client->addr);
 

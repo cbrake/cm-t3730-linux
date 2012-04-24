@@ -725,12 +725,6 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP3_MUX(HSUSB0_DATA6, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
 	OMAP3_MUX(HSUSB0_DATA7, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
 
-	/* MMC 2 */
-	OMAP3_MUX(SDMMC2_DAT4, OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT),
-	OMAP3_MUX(SDMMC2_DAT5, OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT),
-	OMAP3_MUX(SDMMC2_DAT6, OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT),
-	OMAP3_MUX(SDMMC2_DAT7, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
-
 	/* McSPI 1 */
 	OMAP3_MUX(MCSPI1_CLK, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
 	OMAP3_MUX(MCSPI1_SIMO, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
@@ -835,6 +829,13 @@ static void __init cm_t35_init_mux(void)
 	omap_mux_init_signal("dss_data4.dss_data4", mux_mode);
 	omap_mux_init_signal("dss_data5.dss_data5", mux_mode);
 	cm_t3x_common_dss_mux_init(mux_mode);
+
+	/* MMC 2 */
+	mux_mode = OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT;
+	omap_mux_init_signal("sdmmc2_dir_dat0", mux_mode);
+	omap_mux_init_signal("sdmmc2_dir_dat1", mux_mode);
+	omap_mux_init_signal("sdmmc2_dir_cmd", mux_mode);
+	omap_mux_init_signal("sdmmc2_clkin", OMAP_MUX_MODE1 | OMAP_PIN_INPUT);
 }
 
 static void __init cm_t3730_init_mux(void)

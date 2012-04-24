@@ -63,10 +63,6 @@
 #define SB_T35_SMSC911X_CS	4
 #define SB_T35_SMSC911X_GPIO	65
 
-#define CAM_PCA9543APW_ADDR 		0x73
-#define CAM_PCA9543APW_CTLREG		0x0
-#define CAM_PCA9543APW_CTLREG_B0 	(1 << 0)
-
 #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
 #include <linux/smsc911x.h>
 #include <plat/gpmc-smsc911x.h>
@@ -208,7 +204,6 @@ static struct omap_nand_platform_data cm_t35_nand_data = {
 	.nr_parts		= ARRAY_SIZE(cm_t35_nand_partitions),
 	.dma_channel		= -1,	/* disable DMA in OMAP NAND driver */
 	.cs			= 0,
-
 };
 
 static void __init cm_t35_init_nand(void)
@@ -716,6 +711,11 @@ static struct i2c_board_info cm_t35_i2c1_eeprom_info __initdata = {
 
 #if defined(CONFIG_VIDEO_MT9T001) || defined(CONFIG_VIDEO_MT9T001_MODULE)
 #include <media/mt9t001.h>
+
+#define CAM_PCA9543APW_ADDR		0x73
+#define CAM_PCA9543APW_CTLREG		0x0
+#define CAM_PCA9543APW_CTLREG_B0	(1 << 0)
+
 static void mt9t001_i2c_evalboard_setup(struct i2c_client *client)
 {
 	union i2c_smbus_data val = { .byte = CAM_PCA9543APW_CTLREG_B0 };

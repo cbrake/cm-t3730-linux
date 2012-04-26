@@ -1045,16 +1045,23 @@ static void __devinit ads7846_setup_spi_msg(struct ads7846 *ts,
 	 */
 	if (pdata->settle_delay_usecs) {
 		x->delay_usecs = pdata->settle_delay_usecs;
+		if (ts->model == 7845) {
+			x++;
+			x->tx_buf = &packet->read_y_cmd[0];
+			x->rx_buf = &packet->tc.y_buf[0];
+			x->len = 3;
+			spi_message_add_tail(x, m);
+		} else {
+			x++;
+			x->tx_buf = &packet->read_y;
+			x->len = 1;
+			spi_message_add_tail(x, m);
 
-		x++;
-		x->tx_buf = &packet->read_y;
-		x->len = 1;
-		spi_message_add_tail(x, m);
-
-		x++;
-		x->rx_buf = &packet->tc.y;
-		x->len = 2;
-		spi_message_add_tail(x, m);
+			x++;
+			x->rx_buf = &packet->tc.y;
+			x->len = 2;
+			spi_message_add_tail(x, m);
+		}
 	}
 
 	ts->msg_count++;
@@ -1088,16 +1095,23 @@ static void __devinit ads7846_setup_spi_msg(struct ads7846 *ts,
 	/* ... maybe discard first sample ... */
 	if (pdata->settle_delay_usecs) {
 		x->delay_usecs = pdata->settle_delay_usecs;
+		if (ts->model == 7845) {
+			x++;
+			x->tx_buf = &packet->read_x_cmd[0];
+			x->rx_buf = &packet->tc.x_buf[0];
+			x->len = 3;
+			spi_message_add_tail(x, m);
+		} else {
+			x++;
+			x->tx_buf = &packet->read_x;
+			x->len = 1;
+			spi_message_add_tail(x, m);
 
-		x++;
-		x->tx_buf = &packet->read_x;
-		x->len = 1;
-		spi_message_add_tail(x, m);
-
-		x++;
-		x->rx_buf = &packet->tc.x;
-		x->len = 2;
-		spi_message_add_tail(x, m);
+			x++;
+			x->rx_buf = &packet->tc.x;
+			x->len = 2;
+			spi_message_add_tail(x, m);
+		}
 	}
 
 	/* turn y+ off, x- on; we'll use formula #2 */

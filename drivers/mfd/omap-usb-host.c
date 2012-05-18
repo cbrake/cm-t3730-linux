@@ -703,16 +703,6 @@ static int usbhs_enable(struct device *dev)
 		return  -ENODEV;
 	}
 
-	spin_lock_irqsave(&omap->lock, flags);
-	if (omap->count > 0)
-		goto end_count;
-
-	clk_enable(omap->usbhost_ick);
-	clk_enable(omap->usbhost_hs_fck);
-	clk_enable(omap->usbhost_fs_fck);
-	clk_enable(omap->usbtll_fck);
-	clk_enable(omap->usbtll_ick);
-
 	if (pdata->ehci_data->phy_reset) {
 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0])) {
 			gpio_request(pdata->ehci_data->reset_gpio_port[0],
@@ -731,6 +721,16 @@ static int usbhs_enable(struct device *dev)
 		/* Hold the PHY in RESET for enough time till DIR is high */
 		udelay(10);
 	}
+
+	spin_lock_irqsave(&omap->lock, flags);
+	if (omap->count > 0)
+		goto end_count;
+
+	clk_enable(omap->usbhost_ick);
+	clk_enable(omap->usbhost_hs_fck);
+	clk_enable(omap->usbhost_fs_fck);
+	clk_enable(omap->usbtll_fck);
+	clk_enable(omap->usbtll_ick);
 
 	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
 	dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
@@ -897,6 +897,10 @@ static int usbhs_enable(struct device *dev)
 			usbhs_omap_tll_init(dev, OMAP_TLL_CHANNEL_COUNT);
 	}
 
+end_count:
+	omap->count++;
+	spin_unlock_irqrestore(&omap->lock, flags);
+
 	if (pdata->ehci_data->phy_reset) {
 		/* Hold the PHY in RESET for enough time till
 		 * PHY is settled and ready
@@ -912,12 +916,16 @@ static int usbhs_enable(struct device *dev)
 				(pdata->ehci_data->reset_gpio_port[1], 1);
 	}
 
-end_count:
-	omap->count++;
-	spin_unlock_irqrestore(&omap->lock, flags);
 	return 0;
 
 err_tll:
+	clk_disable(omap->usbtll_ick);
+	clk_disable(omap->usbtll_fck);
+	clk_disable(omap->usbhost_fs_fck);
+	clk_disable(omap->usbhost_hs_fck);
+	clk_disable(omap->usbhost_ick);
+	spin_unlock_irqrestore(&omap->lock, flags);
+
 	if (pdata->ehci_data->phy_reset) {
 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
 			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
@@ -926,12 +934,6 @@ err_tll:
 			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
 	}
 
-	clk_disable(omap->usbtll_ick);
-	clk_disable(omap->usbtll_fck);
-	clk_disable(omap->usbhost_fs_fck);
-	clk_disable(omap->usbhost_hs_fck);
-	clk_disable(omap->usbhost_ick);
-	spin_unlock_irqrestore(&omap->lock, flags);
 	return ret;
 }
 

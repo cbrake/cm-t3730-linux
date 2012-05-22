@@ -59,6 +59,10 @@ enum {
  *		0 - Active high, 1 - Active low
  * @data_pol: Data polarity
  *		0 - Normal, 1 - One's complement
+ * @bt656: ITU-R BT656 embedded synchronization
+ *		0 - HS/VS sync, 1 - BT656 sync
+ * @fldmode: Field mode
+ *             0 - progressive, 1 - Interlaced
  */
 struct isp_parallel_platform_data {
 	unsigned int data_lane_shift:2;
@@ -66,6 +70,8 @@ struct isp_parallel_platform_data {
 	unsigned int hs_pol:1;
 	unsigned int vs_pol:1;
 	unsigned int data_pol:1;
+	unsigned int bt656:1;
+	unsigned int fldmode:1;
 };
 
 enum {

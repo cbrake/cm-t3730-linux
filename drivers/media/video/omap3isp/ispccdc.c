@@ -1018,6 +1018,9 @@ static void ccdc_config_sync_if(struct isp_ccdc_device *ccdc,
 	if (pdata && pdata->vs_pol)
 		syn_mode |= ISPCCDC_SYN_MODE_VDPOL;
 
+	if (pdata && pdata->fldmode)
+		syn_mode |= ISPCCDC_SYN_MODE_FLDMODE;
+
 	isp_reg_writel(isp, syn_mode, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SYN_MODE);
 
 	if (format->code == V4L2_MBUS_FMT_UYVY8_2X8)
@@ -1033,6 +1036,7 @@ static void ccdc_config_sync_if(struct isp_ccdc_device *ccdc,
 	else
 		isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_REC656IF,
 			    ISPCCDC_REC656IF_R656ON | ISPCCDC_REC656IF_ECCFVH);
+
 }
 
 /* CCDC formats descriptions */
@@ -1218,10 +1222,12 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 	/* CCDC_PAD_SOURCE_OF */
 	format = &ccdc->formats[CCDC_PAD_SOURCE_OF];
 
+	isp_video_mbus_to_pix(&ccdc->video_out, format, &pix);
+
 	/* For BT656 the number of bytes would be width*2 */
 	if (pdata->bt656)
 		isp_reg_writel(isp, (0 << ISPCCDC_HORZ_INFO_SPH_SHIFT) |
-			((format->width * 2 - 1) << ISPCCDC_HORZ_INFO_NPH_SHIFT),
+			((pix.bytesperline - 1) << ISPCCDC_HORZ_INFO_NPH_SHIFT),
 			OMAP3_ISP_IOMEM_CCDC, ISPCCDC_HORZ_INFO);
 	else
 		isp_reg_writel(isp, (0 << ISPCCDC_HORZ_INFO_SPH_SHIFT) |
@@ -1248,7 +1254,15 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
 		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST3_SHIFT);
 
-	ccdc_config_outlineoffset(ccdc, ccdc->video_out.bpl_value, 0, 0);
+	/* In case of BT656 each alternate line must be stored into memory */
+	if (pdata->bt656) {
+		ccdc_config_outlineoffset(ccdc, pix.bytesperline, EVENEVEN, 1);
+		ccdc_config_outlineoffset(ccdc, pix.bytesperline, EVENODD, 1);
+		ccdc_config_outlineoffset(ccdc, pix.bytesperline, ODDEVEN, 1);
+		ccdc_config_outlineoffset(ccdc, pix.bytesperline, ODDODD, 1);
+	} else {
+		ccdc_config_outlineoffset(ccdc, ccdc->video_out.bpl_value, 0, 0);
+	}
 
 	/* CCDC_PAD_SOURCE_VP */
 	format = &ccdc->formats[CCDC_PAD_SOURCE_VP];
@@ -1591,6 +1605,7 @@ static void ccdc_vd0_isr(struct isp_ccdc_device *ccdc)
 			fid = syn_mode & ISPCCDC_SYN_MODE_FLDSTAT;
 			/* toggle the software maintained fid */
 			ccdc->fldstat ^= 1;
+
 			if (fid == ccdc->fldstat) {
 				if (fid == 0) {
 					restart = ccdc_isr_buffer(ccdc);

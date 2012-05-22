@@ -945,6 +945,9 @@ static int tvp5150_set_pad_format(struct v4l2_subdev *subdev,
 
 	tvp5150->format = &tvp515x_std_list[tvp5150->std_idx].format;
 
+	tvp5150->format->width = format->format.width;
+	tvp5150->format->height = format->format.height;
+
 	format->format = *__tvp5150_get_pad_format(tvp5150, fh, format->pad,
 	format->which);
 

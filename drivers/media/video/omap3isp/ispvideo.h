@@ -200,7 +200,9 @@ struct isp_buffer *omap3isp_video_buffer_next(struct isp_video *video,
 					      unsigned int error);
 void omap3isp_video_resume(struct isp_video *video, int continuous);
 struct media_pad *omap3isp_video_remote_pad(struct isp_video *video);
-
+extern unsigned int isp_video_mbus_to_pix(const struct isp_video *video,
+				  const struct v4l2_mbus_framefmt *mbus,
+				  struct v4l2_pix_format *pix);
 const struct isp_format_info *
 omap3isp_video_format_info(enum v4l2_mbus_pixelcode code);
 

@@ -164,7 +164,7 @@ static bool isp_video_is_shiftable(enum v4l2_mbus_pixelcode in,
  *
  * Return the number of padding bytes at end of line.
  */
-static unsigned int isp_video_mbus_to_pix(const struct isp_video *video,
+unsigned int isp_video_mbus_to_pix(const struct isp_video *video,
 					  const struct v4l2_mbus_framefmt *mbus,
 					  struct v4l2_pix_format *pix)
 {

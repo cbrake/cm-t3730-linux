@@ -159,6 +159,7 @@ struct isp_ccdc_device {
 	struct ispccdc_vp vpcfg;
 
 	unsigned int underrun:1;
+	unsigned int fldstat:1;
 	enum isp_pipeline_stream_state state;
 	spinlock_t lock;
 	wait_queue_head_t wait;

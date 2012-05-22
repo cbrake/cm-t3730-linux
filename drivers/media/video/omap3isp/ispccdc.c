@@ -59,7 +59,10 @@ static const unsigned int ccdc_fmts[] = {
 	V4L2_MBUS_FMT_SGBRG12_1X12,
 	V4L2_MBUS_FMT_YUYV8_2X8,
 	V4L2_MBUS_FMT_UYVY8_2X8,
+	V4L2_MBUS_FMT_YUYV8_2X8,
 };
+
+static bool ccdc_input_is_bt656(struct isp_ccdc_device *ccdc);
 
 /*
  * ccdc_print_status - Print current CCDC Module register values.
@@ -792,11 +795,16 @@ static void ccdc_apply_controls(struct isp_ccdc_device *ccdc)
 void omap3isp_ccdc_restore_context(struct isp_device *isp)
 {
 	struct isp_ccdc_device *ccdc = &isp->isp_ccdc;
+	struct v4l2_mbus_framefmt *format;
 
 	isp_reg_set(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_CFG, ISPCCDC_CFG_VDLC);
 
-	ccdc->update = OMAP3ISP_CCDC_ALAW | OMAP3ISP_CCDC_LPF
-		     | OMAP3ISP_CCDC_BLCLAMP | OMAP3ISP_CCDC_BCOMP;
+	/* CCDC_PAD_SINK */
+	format = &ccdc->formats[CCDC_PAD_SINK];
+	if ((format->code != V4L2_MBUS_FMT_UYVY8_2X8) &&
+			(format->code != V4L2_MBUS_FMT_UYVY8_2X8))
+		ccdc->update = OMAP3ISP_CCDC_ALAW | OMAP3ISP_CCDC_LPF
+				| OMAP3ISP_CCDC_BLCLAMP | OMAP3ISP_CCDC_BCOMP;
 	ccdc_apply_controls(ccdc);
 	ccdc_configure_fpc(ccdc);
 }
@@ -977,10 +985,13 @@ static void ccdc_config_sync_if(struct isp_ccdc_device *ccdc,
 
 	if (format->code == V4L2_MBUS_FMT_YUYV8_2X8 ||
 	    format->code == V4L2_MBUS_FMT_UYVY8_2X8) {
-		/* The bridge is enabled for YUV8 formats. Configure the input
-		 * mode accordingly.
+		/* The bridge is enabled for non-BT.656 YUV8 formats. Configure
+		 * the input mode accordingly.
 		 */
-		syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
+		if (pdata && pdata->bt656)
+			syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
+		else
+			syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
 	}
 
 	switch (data_size) {
@@ -1016,8 +1027,12 @@ static void ccdc_config_sync_if(struct isp_ccdc_device *ccdc,
 		isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_CFG,
 			    ISPCCDC_CFG_Y8POS);
 
-	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_REC656IF,
-		    ISPCCDC_REC656IF_R656ON);
+	if (pdata && pdata->bt656)
+		isp_reg_set(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_REC656IF,
+			    ISPCCDC_REC656IF_R656ON | ISPCCDC_REC656IF_ECCFVH);
+	else
+		isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_REC656IF,
+			    ISPCCDC_REC656IF_R656ON | ISPCCDC_REC656IF_ECCFVH);
 }
 
 /* CCDC formats descriptions */
@@ -1099,6 +1114,7 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 	struct isp_parallel_platform_data *pdata = NULL;
 	struct v4l2_subdev *sensor;
 	struct v4l2_mbus_framefmt *format;
+	struct v4l2_pix_format pix;
 	const struct isp_format_info *fmt_info;
 	struct v4l2_subdev_format fmt_src;
 	unsigned int depth_out;
@@ -1116,7 +1132,7 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 			->bus.parallel;
 
 	/* Compute the lane shifter shift value and enable the bridge when the
-	 * input format is YUV.
+	 * input format is a non-BT.656 YUV variant.
 	 */
 	fmt_src.pad = pad->index;
 	fmt_src.which = V4L2_SUBDEV_FORMAT_ACTIVE;
@@ -1131,8 +1147,9 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 
 	shift = depth_in - depth_out;
 	omap3isp_configure_bridge(isp, ccdc->input, pdata, shift,
-				  fmt_info->code == V4L2_MBUS_FMT_YUYV8_2X8 ||
-				  fmt_info->code == V4L2_MBUS_FMT_UYVY8_2X8);
+				  (fmt_info->code == V4L2_MBUS_FMT_YUYV8_2X8 ||
+				   fmt_info->code == V4L2_MBUS_FMT_UYVY8_2X8) &&
+				  (pdata == NULL || !pdata->bt656));
 
 	ccdc_config_sync_if(ccdc, pdata, depth_out);
 
@@ -1156,6 +1173,9 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 	/* CCDC_PAD_SINK */
 	format = &ccdc->formats[CCDC_PAD_SINK];
 
+	if (format->code == V4L2_MBUS_FMT_UYVY8_2X8)
+		isp_reg_set(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_CFG,
+			    ISPCCDC_CFG_Y8POS);
 	/* Mosaic filter */
 	switch (format->code) {
 	case V4L2_MBUS_FMT_SRGGB10_1X10:
@@ -1175,26 +1195,58 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 		ccdc_pattern = ccdc_sgrbg_pattern;
 		break;
 	}
-	ccdc_config_imgattr(ccdc, ccdc_pattern);
 
-	/* Generate VD0 on the last line of the image and VD1 on the
-	 * 2/3 height line.
-	 */
-	isp_reg_writel(isp, ((format->height - 2) << ISPCCDC_VDINT_0_SHIFT) |
-		       ((format->height * 2 / 3) << ISPCCDC_VDINT_1_SHIFT),
-		       OMAP3_ISP_IOMEM_CCDC, ISPCCDC_VDINT);
+	if ((format->code != V4L2_MBUS_FMT_YUYV8_2X8) &&
+			(format->code != V4L2_MBUS_FMT_UYVY8_2X8))
+		ccdc_config_imgattr(ccdc, ccdc_pattern);
+
+	/* BT656: Generate VD0 on the last line of each field, and we
+	* don't use VD1.
+	* Non BT656: Generate VD0 on the last line of the image and VD1 on the
+	* 2/3 height line.
+	*/
+	if (pdata->bt656)
+		isp_reg_writel(isp,
+			(format->height/2 - 2) << ISPCCDC_VDINT_0_SHIFT,
+			OMAP3_ISP_IOMEM_CCDC, ISPCCDC_VDINT);
+	else
+		isp_reg_writel(isp,
+			((format->height - 2) << ISPCCDC_VDINT_0_SHIFT) |
+			((format->height * 2 / 3) << ISPCCDC_VDINT_1_SHIFT),
+			OMAP3_ISP_IOMEM_CCDC, ISPCCDC_VDINT);
 
 	/* CCDC_PAD_SOURCE_OF */
 	format = &ccdc->formats[CCDC_PAD_SOURCE_OF];
 
-	isp_reg_writel(isp, (0 << ISPCCDC_HORZ_INFO_SPH_SHIFT) |
+	/* For BT656 the number of bytes would be width*2 */
+	if (pdata->bt656)
+		isp_reg_writel(isp, (0 << ISPCCDC_HORZ_INFO_SPH_SHIFT) |
+			((format->width * 2 - 1) << ISPCCDC_HORZ_INFO_NPH_SHIFT),
+			OMAP3_ISP_IOMEM_CCDC, ISPCCDC_HORZ_INFO);
+	else
+		isp_reg_writel(isp, (0 << ISPCCDC_HORZ_INFO_SPH_SHIFT) |
 		       ((format->width - 1) << ISPCCDC_HORZ_INFO_NPH_SHIFT),
 		       OMAP3_ISP_IOMEM_CCDC, ISPCCDC_HORZ_INFO);
 	isp_reg_writel(isp, 0 << ISPCCDC_VERT_START_SLV0_SHIFT,
 		       OMAP3_ISP_IOMEM_CCDC, ISPCCDC_VERT_START);
-	isp_reg_writel(isp, (format->height - 1)
+
+	if (pdata->bt656)
+		isp_reg_writel(isp, ((format->height >> 1) - 1)
+			<< ISPCCDC_VERT_LINES_NLV_SHIFT,
+			OMAP3_ISP_IOMEM_CCDC, ISPCCDC_VERT_LINES);
+	else
+		isp_reg_writel(isp, (format->height - 1)
 			<< ISPCCDC_VERT_LINES_NLV_SHIFT,
 		       OMAP3_ISP_IOMEM_CCDC, ISPCCDC_VERT_LINES);
+
+	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
+		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST0_SHIFT);
+	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
+		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST1_SHIFT);
+	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
+		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST2_SHIFT);
+	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
+		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST3_SHIFT);
 
 	ccdc_config_outlineoffset(ccdc, ccdc->video_out.bpl_value, 0, 0);
 
@@ -1215,8 +1267,14 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 	/* Use PACK8 mode for 1byte per pixel formats. */
 	if (omap3isp_video_format_info(format->code)->width <= 8)
 		syn_mode |= ISPCCDC_SYN_MODE_PACK8;
-	else
-		syn_mode &= ~ISPCCDC_SYN_MODE_PACK8;
+
+	if ((format->code == V4L2_MBUS_FMT_YUYV8_2X8) ||
+		(format->code == V4L2_MBUS_FMT_UYVY8_2X8)) {
+		if (pdata->bt656)
+			syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
+		else
+			syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
+	}
 
 	isp_reg_writel(isp, syn_mode, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SYN_MODE);
 
@@ -1243,6 +1301,11 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 unlock:
 	spin_unlock_irqrestore(&ccdc->lsc.req_lock, flags);
 
+	if (pdata->bt656)
+		ccdc->update = OMAP3ISP_CCDC_BLCLAMP;
+	else
+		ccdc->update = 0;
+
 	ccdc_apply_controls(ccdc);
 }
 
@@ -1254,6 +1317,7 @@ static void __ccdc_enable(struct isp_ccdc_device *ccdc, int enable)
 			ISPCCDC_PCR_EN, enable ? ISPCCDC_PCR_EN : 0);
 }
 
+static int __ccdc_handle_stopping(struct isp_ccdc_device *ccdc, u32 event);
 static int ccdc_disable(struct isp_ccdc_device *ccdc)
 {
 	unsigned long flags;
@@ -1263,6 +1327,11 @@ static int ccdc_disable(struct isp_ccdc_device *ccdc)
 	if (ccdc->state == ISP_PIPELINE_STREAM_CONTINUOUS)
 		ccdc->stopping = CCDC_STOP_REQUEST;
 	spin_unlock_irqrestore(&ccdc->lock, flags);
+
+	__ccdc_lsc_enable(ccdc, 0);
+	__ccdc_enable(ccdc, 0);
+	ccdc->stopping = CCDC_STOP_EXECUTED;
+	__ccdc_handle_stopping(ccdc, CCDC_STOP_FINISHED);
 
 	ret = wait_event_timeout(ccdc->wait,
 				 ccdc->stopping == CCDC_STOP_FINISHED,
@@ -1512,10 +1581,29 @@ static void ccdc_vd0_isr(struct isp_ccdc_device *ccdc)
 {
 	unsigned long flags;
 	int restart = 0;
+	struct isp_device *isp = to_isp_device(ccdc);
 
-	if (ccdc->output & CCDC_OUTPUT_MEMORY)
-		restart = ccdc_isr_buffer(ccdc);
-
+	if (ccdc->output & CCDC_OUTPUT_MEMORY) {
+		if (ccdc_input_is_bt656(ccdc)) {
+			u32 fid;
+			u32 syn_mode = isp_reg_readl(isp, OMAP3_ISP_IOMEM_CCDC,
+					ISPCCDC_SYN_MODE);
+			fid = syn_mode & ISPCCDC_SYN_MODE_FLDSTAT;
+			/* toggle the software maintained fid */
+			ccdc->fldstat ^= 1;
+			if (fid == ccdc->fldstat) {
+				if (fid == 0) {
+					restart = ccdc_isr_buffer(ccdc);
+					goto done;
+				}
+			} else if (fid == 0) {
+				ccdc->fldstat = fid;
+			}
+		} else {
+			restart = ccdc_isr_buffer(ccdc);
+		}
+	}
+done:
 	spin_lock_irqsave(&ccdc->lock, flags);
 	if (__ccdc_handle_stopping(ccdc, CCDC_EVENT_VD0)) {
 		spin_unlock_irqrestore(&ccdc->lock, flags);
@@ -1601,7 +1689,8 @@ int omap3isp_ccdc_isr(struct isp_ccdc_device *ccdc, u32 events)
 	if (ccdc->state == ISP_PIPELINE_STREAM_STOPPED)
 		return 0;
 
-	if (events & IRQ0STATUS_CCDC_VD1_IRQ)
+	if (!ccdc_input_is_bt656(ccdc) &&
+			(events & IRQ0STATUS_CCDC_VD1_IRQ))
 		ccdc_vd1_isr(ccdc);
 
 	ccdc_lsc_isr(ccdc, events);
@@ -1609,7 +1698,8 @@ int omap3isp_ccdc_isr(struct isp_ccdc_device *ccdc, u32 events)
 	if (events & IRQ0STATUS_CCDC_VD0_IRQ)
 		ccdc_vd0_isr(ccdc);
 
-	if (events & IRQ0STATUS_HS_VS_IRQ)
+	if (!ccdc_input_is_bt656(ccdc) &&
+			(events & IRQ0STATUS_HS_VS_IRQ))
 		ccdc_hs_vs_isr(ccdc);
 
 	return 0;
@@ -1703,6 +1793,7 @@ static int ccdc_set_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct isp_ccdc_device *ccdc = v4l2_get_subdevdata(sd);
 	struct isp_device *isp = to_isp_device(ccdc);
+	int vp_enable = !ccdc_input_is_bt656(ccdc);
 	int ret = 0;
 
 	if (ccdc->state == ISP_PIPELINE_STREAM_STOPPED) {
@@ -1719,7 +1810,7 @@ static int ccdc_set_stream(struct v4l2_subdev *sd, int enable)
 		 * links are inactive.
 		 */
 		ccdc_config_vp(ccdc);
-		ccdc_enable_vp(ccdc, 1);
+		ccdc_enable_vp(ccdc, vp_enable);
 		ccdc->error = 0;
 		ccdc_print_status(ccdc);
 	}
@@ -1766,6 +1857,23 @@ __ccdc_get_format(struct isp_ccdc_device *ccdc, struct v4l2_subdev_fh *fh,
 		return &ccdc->formats[pad];
 }
 
+static bool ccdc_input_is_bt656(struct isp_ccdc_device *ccdc)
+{
+	const struct isp_parallel_platform_data *pdata = NULL;
+	const struct v4l2_subdev *sensor;
+	const struct media_pad *pad;
+
+	if (ccdc->input != CCDC_INPUT_PARALLEL)
+		return false;
+
+	pad = media_entity_remote_source(&ccdc->pads[CCDC_PAD_SINK]);
+	sensor = media_entity_to_v4l2_subdev(pad->entity);
+	pdata = &((struct isp_v4l2_subdevs_group *)sensor->host_priv)
+		->bus.parallel;
+
+	return pdata && pdata->bt656;
+}
+
 /*
  * ccdc_try_format - Try video format on a pad
  * @ccdc: ISP CCDC device
@@ -1802,13 +1910,15 @@ ccdc_try_format(struct isp_ccdc_device *ccdc, struct v4l2_subdev_fh *fh,
 	case CCDC_PAD_SOURCE_OF:
 		*fmt = *__ccdc_get_format(ccdc, fh, CCDC_PAD_SINK, which);
 
-		/* In YUV mode the bridge will be enabled, converting the input
-		 * format from 2X8 to 1X16.
+		/* In non-BT656 YUV mode the bridge will be enabled, converting
+		 * the input format from 2X8 to 1X16.
 		 */
-		if (fmt->code == V4L2_MBUS_FMT_YUYV8_2X8)
-			fmt->code = V4L2_MBUS_FMT_YUYV8_1X16;
-		else if (fmt->code == V4L2_MBUS_FMT_UYVY8_2X8)
-			fmt->code = V4L2_MBUS_FMT_UYVY8_1X16;
+		if (!ccdc_input_is_bt656(ccdc)) {
+			if (fmt->code == V4L2_MBUS_FMT_YUYV8_2X8)
+				fmt->code = V4L2_MBUS_FMT_YUYV8_1X16;
+			else if (fmt->code == V4L2_MBUS_FMT_UYVY8_2X8)
+				fmt->code = V4L2_MBUS_FMT_UYVY8_1X16;
+		}
 
 		/* The output formatter truncates the number of horizontal
 		 * output pixels to a multiple of 16. To avoid clipping data,
@@ -2246,7 +2356,7 @@ int omap3isp_ccdc_init(struct isp_device *isp)
 
 	ccdc->vpcfg.pixelclk = 0;
 
-	ccdc->update = OMAP3ISP_CCDC_BLCLAMP;
+	ccdc->update = 0;
 	ccdc_apply_controls(ccdc);
 
 	return ccdc_init_entities(ccdc);

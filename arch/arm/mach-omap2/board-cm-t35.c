@@ -765,7 +765,6 @@ static struct isp_v4l2_subdevs_group cm_t35_isp_mt9t001_subdevs[] = {
 			.parallel = {
 				.data_lane_shift = 0,
 				.clk_pol	 = 1,
-				.bridge		 = ISPCTRL_PAR_BRIDGE_DISABLE,
 			},
 		},
 	},

@@ -966,10 +966,6 @@ static int tvp5150_set_pad_format(struct v4l2_subdev *subdev,
 	format->format = *__tvp5150_get_pad_format(tvp5150, fh, format->pad,
 	format->which);
 
-	v4l2_info(subdev, "code=x%x width=%u height=%u colorspace=0x%x\n",
-			format->format.code, format->format.width,
-			format->format.height, format->format.colorspace);
-
 	return 0;
 }
 

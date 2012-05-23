@@ -45,6 +45,7 @@
 #include <plat/usb.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-generic-dpi.h>
+#include <media/mt9t001.h>
 #include <plat/mcspi.h>
 
 #include <mach/hardware.h>
@@ -706,12 +707,7 @@ static struct i2c_board_info cm_t35_i2c1_eeprom_info __initdata = {
 	.platform_data = &cm_t35_eeprom_pdata,
 };
 
-#if defined(CONFIG_VIDEO_OMAP3) || defined(CONFIG_VIDEO_OMAP3_MODULE)
-#include "../../../drivers/media/video/omap3isp/isp.h"
-
 #if defined(CONFIG_VIDEO_MT9T001) || defined(CONFIG_VIDEO_MT9T001_MODULE)
-#include <media/mt9t001.h>
-
 #define CAM_PCA9543APW_ADDR		0x73
 #define CAM_PCA9543APW_CTLREG		0x0
 #define CAM_PCA9543APW_CTLREG_B0	(1 << 0)
@@ -731,18 +727,34 @@ static void mt9t001_i2c_evalboard_setup(struct i2c_client *client)
 static struct mt9t001_platform_data cm_t35_mt9t001_pdata = {
 	.custom_setup = mt9t001_i2c_evalboard_setup,
 };
+#else
+static struct mt9t001_platform_data cm_t35_mt9t001_pdata = {};
+#endif /* CONFIG_VIDEO_MT9T001 */
 
 static struct i2c_board_info cm_t35_i2c3_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("mt9t001", 0x5d),
 		.platform_data = &cm_t35_mt9t001_pdata,
+
+	},
+	{
+		I2C_BOARD_INFO("tvp5150", 0x5c),
 	},
 };
-#endif /* CONFIG_VIDEO_MT9T001 */
 
+#if defined(CONFIG_VIDEO_OMAP3) || defined(CONFIG_VIDEO_OMAP3_MODULE)
+#include <media/omap3isp.h>
 static struct isp_subdev_i2c_board_info cm_t35_isp_primary_subdevs[] = {
 	{
 		.board_info = &cm_t35_i2c3_boardinfo[0],
+		.i2c_adapter_id = 3,
+	},
+	{ NULL, 0, },
+};
+
+static struct isp_subdev_i2c_board_info cm_t35_isp_secondary_subdevs[] = {
+	{
+		.board_info = &cm_t35_i2c3_boardinfo[1],
 		.i2c_adapter_id = 3,
 	},
 	{ NULL, 0, },
@@ -756,15 +768,24 @@ static struct isp_wbal_pdata cm_t35_isp_mt9t001_wbal = {
 	.coef3 = 0x1C,
 };
 
-static struct isp_v4l2_subdevs_group cm_t35_isp_mt9t001_subdevs[] = {
+static struct isp_v4l2_subdevs_group cm_t35_isp_subdevs[] = {
 	{
 		.subdevs = cm_t35_isp_primary_subdevs,
 		.wbal = &cm_t35_isp_mt9t001_wbal,
 		.interface = ISP_INTERFACE_PARALLEL,
 		.bus = {
 			.parallel = {
-				.data_lane_shift = 0,
-				.clk_pol	 = 1,
+				.clk_pol	= 1,
+			},
+		},
+	},
+	{
+		.subdevs = cm_t35_isp_secondary_subdevs,
+		.interface = ISP_INTERFACE_PARALLEL,
+		.bus = {
+			.parallel = {
+				.fldmode	= 1,
+				.bt656		= 1,
 			},
 		},
 	},
@@ -772,7 +793,7 @@ static struct isp_v4l2_subdevs_group cm_t35_isp_mt9t001_subdevs[] = {
 };
 
 static struct isp_platform_data cm_t35_isp_pdata = {
-	.subdevs = cm_t35_isp_mt9t001_subdevs,
+	.subdevs = cm_t35_isp_subdevs,
 };
 
 static void __init cm_t35_init_camera(void)

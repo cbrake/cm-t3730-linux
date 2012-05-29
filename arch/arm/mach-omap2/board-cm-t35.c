@@ -389,6 +389,24 @@ static struct regulator_consumer_supply cm_t35_vio_supplies[] = {
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
 };
 
+static struct regulator_consumer_supply cm_t3730_vaux2_supplies[] = {
+	REGULATOR_SUPPLY("vmmc_aux", "omap_hsmmc.1"),
+};
+
+/* VAUX2 for the WL12xx combo chip */
+static struct regulator_init_data cm_t3730_vaux2 = {
+	.constraints = {
+		.min_uV			= 1800000,
+		.max_uV			= 1800000,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(cm_t3730_vaux2_supplies),
+	.consumer_supplies	= cm_t3730_vaux2_supplies,
+};
+
 /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
 static struct regulator_init_data cm_t35_vmmc1 = {
 	.constraints = {
@@ -682,6 +700,7 @@ static struct twl4030_platform_data cm_t35_twldata = {
 	.vdac		= &cm_t35_vdac,
 	.vio		= &cm_t35_vio,
 	.madc		= &cm_t35_madc_data,
+	.vaux2		= &cm_t3730_vaux2,
 };
 
 static struct platform_device cm_t35_madc_hwmon = {

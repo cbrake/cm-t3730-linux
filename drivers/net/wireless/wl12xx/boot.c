@@ -31,7 +31,7 @@
 #include "event.h"
 #include "rx.h"
 
-static struct wl1271_partition_set part_table[PART_TABLE_LEN] = {
+struct wl1271_partition_set part_table[PART_TABLE_LEN] = {
 	[PART_DOWN] = {
 		.mem = {
 			.start = 0x00000000,

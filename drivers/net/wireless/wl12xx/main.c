@@ -1031,18 +1031,37 @@ static int wl1271_setup(struct wl1271 *wl)
 	return 0;
 }
 
-static int wl1271_chip_wakeup(struct wl1271 *wl)
+extern struct wl1271_partition_set part_table[PART_TABLE_LEN];
+
+static int wl12xx_set_power_on(struct wl1271 *wl)
 {
-	struct wl1271_partition_set partition;
-	int ret = 0;
+	int ret;
 
 	msleep(WL1271_PRE_POWER_ON_SLEEP);
 	ret = wl1271_power_on(wl);
 	if (ret < 0)
-		goto out;
+		return ret;
+
 	msleep(WL1271_POWER_ON_SLEEP);
 	wl1271_io_reset(wl);
 	wl1271_io_init(wl);
+
+	wl1271_set_partition(wl, &part_table[PART_DOWN]);
+
+	/* ELP module wake up */
+	wl1271_fw_wakeup(wl);
+
+	return ret;
+}
+
+static int wl1271_chip_wakeup(struct wl1271 *wl)
+{
+	struct wl1271_partition_set partition;
+	int ret;
+
+	ret = wl12xx_set_power_on(wl);
+	if (ret < 0)
+		return ret;
 
 	/* We don't need a real memory partition here, because we only want
 	 * to use the registers at this point. */
@@ -1050,11 +1069,6 @@ static int wl1271_chip_wakeup(struct wl1271 *wl)
 	partition.reg.start = REGISTERS_BASE;
 	partition.reg.size = REGISTERS_DOWN_SIZE;
 	wl1271_set_partition(wl, &partition);
-
-	/* ELP module wake up */
-	wl1271_fw_wakeup(wl);
-
-	/* whal_FwCtrl_BootSm() */
 
 	/* 0. read chip id from CHIP_ID */
 	wl->chip.id = wl1271_read32(wl, CHIP_ID_B);
@@ -3781,6 +3795,44 @@ static ssize_t wl1271_sysfs_show_hw_pg_ver(struct device *dev,
 static DEVICE_ATTR(hw_pg_ver, S_IRUGO | S_IWUSR,
 		   wl1271_sysfs_show_hw_pg_ver, NULL);
 
+static void wl12xx_get_fuse_mac(struct wl1271 *wl)
+{
+	u32 mac1, mac2, fuse_oui_addr, fuse_nic_addr;
+
+	wl1271_set_partition(wl, &part_table[PART_DRPW]);
+
+	mac1 = wl1271_read32(wl, WL12XX_REG_FUSE_BD_ADDR_1);
+	mac2 = wl1271_read32(wl, WL12XX_REG_FUSE_BD_ADDR_2);
+
+	/* these are the two parts of the BD_ADDR */
+	fuse_oui_addr = ((mac2 & 0xffff) << 8) + ((mac1 & 0xff000000) >> 24);
+	fuse_nic_addr = mac1 & 0xffffff;
+
+	wl->mac_addr[0] = (u8)(fuse_oui_addr >> 16);
+	wl->mac_addr[1] = (u8)(fuse_oui_addr >> 8);
+	wl->mac_addr[2] = (u8) fuse_oui_addr;
+	wl->mac_addr[3] = (u8)(fuse_nic_addr >> 16);
+	wl->mac_addr[4] = (u8)(fuse_nic_addr >> 8);
+	wl->mac_addr[5] = (u8) fuse_nic_addr;
+
+	wl1271_set_partition(wl, &part_table[PART_DOWN]);
+}
+
+static int wl12xx_get_hw_info(struct wl1271 *wl)
+{
+	int ret;
+
+	ret = wl12xx_set_power_on(wl);
+	if (ret < 0)
+		return ret;
+
+	wl12xx_get_fuse_mac(wl);
+
+	wl1271_power_off(wl);
+
+	return 0;
+}
+
 int wl1271_register_hw(struct wl1271 *wl)
 {
 	int ret;
@@ -3788,8 +3840,14 @@ int wl1271_register_hw(struct wl1271 *wl)
 	if (wl->mac80211_registered)
 		return 0;
 
+	ret = wl12xx_get_hw_info(wl);
+	if (ret < 0) {
+		wl1271_error("couldn't get hw info");
+		return ret;
+	}
+
 	ret = wl1271_fetch_nvs(wl);
-	if (ret == 0) {
+	if (ret == 0 && !is_valid_ether_addr(wl->mac_addr)) {
 		/* NOTE: The wl->nvs->nvs element must be first, in
 		 * order to simplify the casting, we assume it is at
 		 * the beginning of the wl->nvs structure.

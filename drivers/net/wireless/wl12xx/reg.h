@@ -600,4 +600,7 @@ b12-b0 - Supported Rate indicator bits as defined below.
  */
 #define INTR_TRIG_TX_PROC1 BIT(18)
 
+#define WL12XX_REG_FUSE_BD_ADDR_1	0x00310eb4
+#define WL12XX_REG_FUSE_BD_ADDR_2	0x00310eb8
+
 #endif

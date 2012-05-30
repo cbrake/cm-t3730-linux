@@ -90,13 +90,14 @@ static void __init cm_t35_init_ethernet(unsigned char *mac)
 	gpmc_smsc911x_init(&cm_t35_smsc911x_cfg);
 }
 
-static void __init sb_t35_init_ethernet(void)
+static void __init sb_t35_init_ethernet(unsigned char *mac)
 {
+	memcpy(sb_t35_smsc911x_cfg.mac, mac, 6);
 	gpmc_smsc911x_init(&sb_t35_smsc911x_cfg);
 }
 #else
 static inline void cm_t35_init_ethernet(unsigned char *mac) {}
-static inline void sb_t35_init_ethernet(void) {}
+static inline void sb_t35_init_ethernet(unsigned char *mac) {}
 #endif
 
 #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
@@ -730,9 +731,6 @@ static void cm_t35_eeprom_setup(struct memory_accessor *mem_acc, void *context)
 
 	eeprom_read_mac_address(mem_acc, mac);
 	cm_t35_init_ethernet(mac);
-
-	/* TODO: this should be called in a sb_t35_eeprom_setup() */
-	sb_t35_init_ethernet();
 }
 
 static struct at24_platform_data cm_t35_eeprom_pdata = {
@@ -744,6 +742,26 @@ static struct at24_platform_data cm_t35_eeprom_pdata = {
 static struct i2c_board_info cm_t35_i2c1_eeprom_info __initdata = {
 	I2C_BOARD_INFO("at24", 0x50),
 	.platform_data = &cm_t35_eeprom_pdata,
+};
+
+static void baseboard_eeprom_setup(struct memory_accessor *mem_acc,
+				   void *context)
+{
+	unsigned char mac[6];
+
+	eeprom_read_mac_address(mem_acc, mac);
+	sb_t35_init_ethernet(mac);
+}
+
+static struct at24_platform_data baseboard_eeprom_pdata = {
+	.byte_len       = 256,
+	.page_size      = 16,
+	.setup          = baseboard_eeprom_setup,
+};
+
+static struct i2c_board_info cm_t35_i2c3_eeprom_info __initdata = {
+	I2C_BOARD_INFO("at24", 0x50),
+	.platform_data = &baseboard_eeprom_pdata,
 };
 
 #if defined(CONFIG_VIDEO_OMAP3) || defined(CONFIG_VIDEO_OMAP3_MODULE)
@@ -860,7 +878,7 @@ static void __init cm_t35_init_i2c(void)
 
 	omap_pmic_init(1, 400, "tps65930", INT_34XX_SYS_NIRQ, &cm_t35_twldata);
 
-	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(3, 400, &cm_t35_i2c3_eeprom_info, 1);
 }
 
 static void __init cm_t35_init_early(void)

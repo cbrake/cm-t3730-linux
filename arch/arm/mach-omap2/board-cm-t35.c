@@ -746,6 +746,9 @@ static struct i2c_board_info cm_t35_i2c1_eeprom_info __initdata = {
 	.platform_data = &cm_t35_eeprom_pdata,
 };
 
+#if defined(CONFIG_VIDEO_OMAP3) || defined(CONFIG_VIDEO_OMAP3_MODULE)
+#include <media/omap3isp.h>
+
 #if defined(CONFIG_VIDEO_MT9T001) || defined(CONFIG_VIDEO_MT9T001_MODULE)
 #define CAM_PCA9543APW_ADDR		0x73
 #define CAM_PCA9543APW_CTLREG		0x0
@@ -770,7 +773,7 @@ static struct mt9t001_platform_data cm_t35_mt9t001_pdata = {
 static struct mt9t001_platform_data cm_t35_mt9t001_pdata = {};
 #endif /* CONFIG_VIDEO_MT9T001 */
 
-static struct i2c_board_info cm_t35_i2c3_boardinfo[] = {
+static struct i2c_board_info cm_t35_isp_i2c_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("mt9t001", 0x5d),
 		.platform_data = &cm_t35_mt9t001_pdata,
@@ -781,11 +784,9 @@ static struct i2c_board_info cm_t35_i2c3_boardinfo[] = {
 	},
 };
 
-#if defined(CONFIG_VIDEO_OMAP3) || defined(CONFIG_VIDEO_OMAP3_MODULE)
-#include <media/omap3isp.h>
 static struct isp_subdev_i2c_board_info cm_t35_isp_primary_subdevs[] = {
 	{
-		.board_info = &cm_t35_i2c3_boardinfo[0],
+		.board_info = &cm_t35_isp_i2c_boardinfo[0],
 		.i2c_adapter_id = 3,
 	},
 	{ NULL, 0, },
@@ -793,7 +794,7 @@ static struct isp_subdev_i2c_board_info cm_t35_isp_primary_subdevs[] = {
 
 static struct isp_subdev_i2c_board_info cm_t35_isp_secondary_subdevs[] = {
 	{
-		.board_info = &cm_t35_i2c3_boardinfo[1],
+		.board_info = &cm_t35_isp_i2c_boardinfo[1],
 		.i2c_adapter_id = 3,
 	},
 	{ NULL, 0, },

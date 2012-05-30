@@ -84,17 +84,9 @@ static struct omap_smsc911x_platform_data sb_t35_smsc911x_cfg = {
 	.flags		= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
 };
 
-#define EEPROM_1ST_MAC_OFF	4
-
-static void __init cm_t35_init_ethernet(struct memory_accessor *mem_acc)
+static void __init cm_t35_init_ethernet(unsigned char *mac)
 {
-	ssize_t ret;
-
-	ret = mem_acc->read(mem_acc, cm_t35_smsc911x_cfg.mac,
-			    EEPROM_1ST_MAC_OFF, ETH_ALEN);
-	if (ret != ETH_ALEN)
-		pr_warning("CM-T35: failed to read MAC address from EEPROM\n");
-
+	memcpy(cm_t35_smsc911x_cfg.mac, mac, 6);
 	gpmc_smsc911x_init(&cm_t35_smsc911x_cfg);
 }
 
@@ -103,7 +95,7 @@ static void __init sb_t35_init_ethernet(void)
 	gpmc_smsc911x_init(&sb_t35_smsc911x_cfg);
 }
 #else
-static inline void cm_t35_init_ethernet(struct memory_accessor *mem_acc) {}
+static inline void cm_t35_init_ethernet(unsigned char *mac) {}
 static inline void sb_t35_init_ethernet(void) {}
 #endif
 
@@ -707,9 +699,37 @@ static struct platform_device cm_t35_madc_hwmon = {
 	.name	= "twl4030_madc_hwmon",
 };
 
+#define EEPROM_1ST_MAC_OFF	4
+
+static int eeprom_read(struct memory_accessor *mem_acc, unsigned char *buf,
+		       int offset, int size, const char* objname)
+{
+	ssize_t ret;
+
+	ret = mem_acc->read(mem_acc, buf, offset, size);
+	if (ret != size) {
+		pr_warning("CM-T3x: failed to read %s from EEPROM\n", objname);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void eeprom_read_mac_address(struct memory_accessor *mem_acc,
+				    unsigned char *mac)
+{
+	char *objname = "MAC address";
+
+	if (eeprom_read(mem_acc, mac, EEPROM_1ST_MAC_OFF, ETH_ALEN, objname))
+		memset(mac, 0, 6);
+}
+
 static void cm_t35_eeprom_setup(struct memory_accessor *mem_acc, void *context)
 {
-	cm_t35_init_ethernet(mem_acc);
+	unsigned char mac[6];
+
+	eeprom_read_mac_address(mem_acc, mac);
+	cm_t35_init_ethernet(mac);
 
 	/* TODO: this should be called in a sb_t35_eeprom_setup() */
 	sb_t35_init_ethernet();

@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/wl12xx.h>
+#include <linux/opp.h>
 
 #include <linux/i2c/at24.h>
 #include <linux/i2c/twl.h>
@@ -47,6 +48,7 @@
 #include <video/omap-panel-generic-dpi.h>
 #include <media/mt9t001.h>
 #include <plat/mcspi.h>
+#include <plat/omap_device.h>
 
 #include <mach/hardware.h>
 
@@ -55,6 +57,7 @@
 #include "hsmmc.h"
 #include "common-board-devices.h"
 #include "devices.h"
+#include "pm.h"
 
 #define CM_T35_GPIO_PENDOWN		57
 #define SB_T35_USB_HUB_RESET_GPIO	167
@@ -881,6 +884,39 @@ static void __init cm_t35_init_i2c(void)
 	omap_register_i2c_bus(3, 400, &cm_t35_i2c3_eeprom_info, 1);
 }
 
+static void __init cm_t3730_opp_init(void)
+{
+	struct omap_hwmod *mpu_hwmod;
+	struct device *dev;
+	int err;
+
+	mpu_hwmod = omap_hwmod_lookup("mpu");
+	if (!mpu_hwmod) {
+		pr_err("%s: can't find mpu hw_mod: %p\n", __func__, mpu_hwmod);
+		return;
+	}
+
+	dev = &mpu_hwmod->od->pdev.dev;
+	/* Enable MPU 800MHz */
+	err = opp_enable(dev, 800000000);
+	if (err) {
+		pr_err("%s: failed enabling mpu OPP120: %d\n", __func__, err);
+		return;
+	}
+
+	/* Enable MPU 1GHz */
+	/* TODO: MPU 1GHz needs ABB */
+	err = opp_enable(dev, 1000000000);
+	if (err)
+		pr_err("%s: failed enabling mpu OPP1G: %d\n", __func__, err);
+}
+
+static void __init cm_t3x_init_opp(void)
+{
+	if (omap3_opp_init())
+		pr_err("%s: opp default init failed\n", __func__);
+}
+
 static void __init cm_t35_init_early(void)
 {
 	omap2_init_common_infrastructure();
@@ -1054,6 +1090,7 @@ static void __init cm_t3x_common_init(void)
 	omap_board_config_size = ARRAY_SIZE(cm_t35_config);
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
 	omap_serial_init();
+	cm_t3x_init_opp();
 	cm_t35_init_i2c();
 	cm_t35_init_touchscreen();
 	cm_t35_init_led();
@@ -1075,6 +1112,7 @@ static void __init cm_t35_init(void)
 static void __init cm_t3730_init(void)
 {
 	cm_t3x_common_init();
+	cm_t3730_opp_init();
 	cm_t3730_init_mux();
 
 	if ((system_rev & 0xffff) < 120) {

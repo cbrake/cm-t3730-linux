@@ -703,7 +703,11 @@ static struct platform_device cm_t35_madc_hwmon = {
 	.name	= "twl4030_madc_hwmon",
 };
 
-#define EEPROM_1ST_MAC_OFF	4
+/* EEPROM layout */
+#define EEPROM_1ST_MAC_OFF		4
+#define EEPROM_1ST_MAC_LEGACY_OFF	0
+#define EEPROM_LAYOUT_VER_OFF		44
+#define EEPROM_LAYOUT_VER_LEN		1
 
 static int eeprom_read(struct memory_accessor *mem_acc, unsigned char *buf,
 		       int offset, int size, const char* objname)
@@ -719,18 +723,34 @@ static int eeprom_read(struct memory_accessor *mem_acc, unsigned char *buf,
 	return 0;
 }
 
+static void eeprom_read_layout_version(struct memory_accessor *mem_acc,
+				       unsigned char *layout)
+{
+	char *objname = "layout version";
+
+	if (eeprom_read(mem_acc, layout, EEPROM_LAYOUT_VER_OFF,
+			EEPROM_LAYOUT_VER_LEN, objname))
+		memset(layout, 0xFF, EEPROM_LAYOUT_VER_LEN);
+}
+
 static void eeprom_read_mac_address(struct memory_accessor *mem_acc,
 				    unsigned char *mac)
 {
 	char *objname = "MAC address";
+	int offset = EEPROM_1ST_MAC_OFF;
+	unsigned char layout;
 
-	if (eeprom_read(mem_acc, mac, EEPROM_1ST_MAC_OFF, ETH_ALEN, objname))
-		memset(mac, 0, 6);
+	eeprom_read_layout_version(mem_acc, &layout);
+	if (layout >= 0x20)
+		offset = EEPROM_1ST_MAC_LEGACY_OFF;
+
+	if (eeprom_read(mem_acc, mac, offset, ETH_ALEN, objname))
+		memset(mac, 0, ETH_ALEN);
 }
 
 static void cm_t35_eeprom_setup(struct memory_accessor *mem_acc, void *context)
 {
-	unsigned char mac[6];
+	unsigned char mac[ETH_ALEN];
 
 	eeprom_read_mac_address(mem_acc, mac);
 	cm_t35_init_ethernet(mac);

@@ -129,7 +129,7 @@ static struct gpio_led_platform_data cm_t35_led_pdata = {
 
 static struct platform_device cm_t35_led_device = {
 	.name		= "leds-gpio",
-	.id		= -1,
+	.id		= 0,
 	.dev		= {
 		.platform_data	= &cm_t35_led_pdata,
 	},
@@ -139,8 +139,37 @@ static void __init cm_t35_init_led(void)
 {
 	platform_device_register(&cm_t35_led_device);
 }
+
+static struct gpio_led cb_t3_leds[] = {
+	{
+		.gpio			= CB_T3_GP_LED_GPIO,
+		.name			= "cb-t3:green",
+		.default_trigger	= "mmc1",
+		.active_low		= 1,
+	},
+};
+
+static struct gpio_led_platform_data cb_t3_led_pdata = {
+	.num_leds	= ARRAY_SIZE(cb_t3_leds),
+	.leds		= cb_t3_leds,
+};
+
+static struct platform_device cb_t3_led_device = {
+	.name		= "leds-gpio",
+	.id		= 1,
+	.dev		= {
+		.platform_data	= &cb_t3_led_pdata,
+	},
+};
+
+static void cb_t3_init_led(void)
+{
+	platform_device_register(&cb_t3_led_device);
+}
+
 #else
 static inline void cm_t35_init_led(void) {}
+static inline void cb_t3_init_led(void) {}
 #endif
 
 #if defined(CONFIG_TOUCHSCREEN_ADS7846)
@@ -823,6 +852,7 @@ static void cb_t3_init_mux(void)
 static void cb_t3_init(void)
 {
 	cb_t3_init_mux();
+	cb_t3_init_led();
 }
 
 static void baseboard_eeprom_setup(struct memory_accessor *mem_acc,

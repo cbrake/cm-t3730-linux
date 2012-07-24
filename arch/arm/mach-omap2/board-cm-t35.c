@@ -60,12 +60,19 @@
 #include "pm.h"
 
 #define CM_T35_GPIO_PENDOWN		57
+#define CM_T35_SMSC911X_CS		5
+#define CM_T35_SMSC911X_GPIO		163
+
+/* SB-T35 board specific GPIOs */
+#define SB_T35_SMSC911X_CS		4
+#define SB_T35_SMSC911X_GPIO		65
 #define SB_T35_USB_HUB_RESET_GPIO	167
 
-#define CM_T35_SMSC911X_CS	5
-#define CM_T35_SMSC911X_GPIO	163
-#define SB_T35_SMSC911X_CS	4
-#define SB_T35_SMSC911X_GPIO	65
+/* CB-T3 board specific GPIOs */
+#define CB_T3_nHP_GPIO			61
+#define CB_T3_nPWRGD_GPIO		65
+#define CB_T3_GP_LED_GPIO		162
+#define CB_T3_nCHRGR_EN_GPIO		164
 
 #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
 #include <linux/smsc911x.h>
@@ -708,6 +715,8 @@ static struct platform_device cm_t35_madc_hwmon = {
 #define EEPROM_1ST_MAC_LEGACY_OFF	0
 #define EEPROM_LAYOUT_VER_OFF		44
 #define EEPROM_LAYOUT_VER_LEN		1
+#define EEPROM_BOARD_NAME_OFF		128
+#define EEPROM_BOARD_NAME_LEN		16
 
 static int eeprom_read(struct memory_accessor *mem_acc, unsigned char *buf,
 		       int offset, int size, const char* objname)
@@ -748,6 +757,16 @@ static void eeprom_read_mac_address(struct memory_accessor *mem_acc,
 		memset(mac, 0, ETH_ALEN);
 }
 
+static void eeprom_read_board_name(struct memory_accessor *mem_acc,
+				   unsigned char *name)
+{
+	char *objname = "board name";
+
+	if (eeprom_read(mem_acc, name, EEPROM_BOARD_NAME_OFF,
+			EEPROM_BOARD_NAME_LEN, objname))
+		memset(name, 0, EEPROM_BOARD_NAME_LEN);
+}
+
 static void cm_t35_eeprom_setup(struct memory_accessor *mem_acc, void *context)
 {
 	unsigned char mac[ETH_ALEN];
@@ -767,13 +786,55 @@ static struct i2c_board_info cm_t35_i2c1_eeprom_info __initdata = {
 	.platform_data = &cm_t35_eeprom_pdata,
 };
 
+static void sb_t35_init_mux(void)
+{
+	/* nCS and IRQ mux for SB-T35 ethernet */
+	omap_mux_init_signal("gpmc_ncs4", OMAP_MUX_MODE0);
+	omap_mux_init_gpio(SB_T35_SMSC911X_GPIO,
+			   OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP);
+}
+
+static void sb_t35_init(struct memory_accessor *mem_acc)
+{
+	unsigned char mac[ETH_ALEN];
+
+	sb_t35_init_mux();
+	eeprom_read_mac_address(mem_acc, mac);
+	sb_t35_init_ethernet(mac);
+}
+
+static void cb_t3_init_mux(void)
+{
+	int mux_mode = OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT;
+
+	/* Stereo enable */
+	omap_mux_init_gpio(CB_T3_nHP_GPIO, mux_mode);
+	/* General purpose LED */
+	omap_mux_init_gpio(CB_T3_GP_LED_GPIO, mux_mode);
+	/* Charger enable */
+	omap_mux_init_gpio(CB_T3_nCHRGR_EN_GPIO, mux_mode);
+
+	mux_mode = OMAP_MUX_MODE4 | OMAP_PIN_INPUT;
+
+	/* Power good */
+	omap_mux_init_gpio(CB_T3_nPWRGD_GPIO, mux_mode);
+}
+
+static void cb_t3_init(void)
+{
+	cb_t3_init_mux();
+}
+
 static void baseboard_eeprom_setup(struct memory_accessor *mem_acc,
 				   void *context)
 {
-	unsigned char mac[6];
+	unsigned char baseboard[EEPROM_BOARD_NAME_LEN];
 
-	eeprom_read_mac_address(mem_acc, mac);
-	sb_t35_init_ethernet(mac);
+	eeprom_read_board_name(mem_acc, baseboard);
+	if (strncmp(baseboard, "CB-T3", EEPROM_BOARD_NAME_LEN) == 0)
+		cb_t3_init();
+	else
+		sb_t35_init(mem_acc);
 }
 
 static struct at24_platform_data baseboard_eeprom_pdata = {
@@ -949,10 +1010,6 @@ static struct omap_board_mux board_mux[] __initdata = {
 	/* nCS and IRQ for CM-T35 ethernet */
 	OMAP3_MUX(GPMC_NCS5, OMAP_MUX_MODE0),
 	OMAP3_MUX(UART3_CTS_RCTX, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
-
-	/* nCS and IRQ for SB-T35 ethernet */
-	OMAP3_MUX(GPMC_NCS4, OMAP_MUX_MODE0),
-	OMAP3_MUX(GPMC_WAIT3, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
 
 	/* PENDOWN GPIO */
 	OMAP3_MUX(GPMC_NCS6, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),

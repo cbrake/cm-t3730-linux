@@ -995,31 +995,42 @@ static void __init cm_t35_init_i2c(void)
 	omap_register_i2c_bus(3, 400, &cm_t35_i2c3_eeprom_info, 1);
 }
 
+static void __init cm_t3730_opp_enable(const char *hwmod_name,
+				       unsigned long *freqs)
+{
+	struct omap_hwmod *hwmod;
+	struct device *dev;
+	int err, i;
+
+	hwmod = omap_hwmod_lookup(hwmod_name);
+	if (!hwmod) {
+		pr_err("%s: can't find %s hwmod: %p\n",
+		       __func__, hwmod_name, hwmod);
+		return;
+	}
+
+	dev = &hwmod->od->pdev.dev;
+
+	for (i = 0; freqs[i]; i++) {
+		err = opp_enable(dev, freqs[i]);
+		if (err) {
+			pr_err("%s: failed enabling %s %luMHz: %d\n",
+			       __func__, hwmod_name, freqs[i], err);
+			return;
+		}
+	}
+}
+
 static void __init cm_t3730_opp_init(void)
 {
-	struct omap_hwmod *mpu_hwmod;
-	struct device *dev;
-	int err;
+	/* MPU 800MHz and 1GHz */
+	unsigned long mpu_freqs[3] = {800000000, 1000000000, 0};
+	/* IVA 660MHz and 800MHz */
+	unsigned long iva_freqs[3] = {660000000,  800000000, 0};
 
-	mpu_hwmod = omap_hwmod_lookup("mpu");
-	if (!mpu_hwmod) {
-		pr_err("%s: can't find mpu hw_mod: %p\n", __func__, mpu_hwmod);
-		return;
-	}
-
-	dev = &mpu_hwmod->od->pdev.dev;
-	/* Enable MPU 800MHz */
-	err = opp_enable(dev, 800000000);
-	if (err) {
-		pr_err("%s: failed enabling mpu OPP120: %d\n", __func__, err);
-		return;
-	}
-
-	/* Enable MPU 1GHz */
 	/* TODO: MPU 1GHz needs ABB */
-	err = opp_enable(dev, 1000000000);
-	if (err)
-		pr_err("%s: failed enabling mpu OPP1G: %d\n", __func__, err);
+	cm_t3730_opp_enable("mpu", mpu_freqs);
+	cm_t3730_opp_enable("iva", iva_freqs);
 }
 
 static void __init cm_t3x_init_opp(void)

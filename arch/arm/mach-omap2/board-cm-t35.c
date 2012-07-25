@@ -244,8 +244,10 @@ static struct omap_nand_platform_data cm_t35_nand_data = {
 
 static void __init cm_t35_init_nand(void)
 {
-	if (gpmc_nand_init(&cm_t35_nand_data) < 0)
-		pr_err("CM-T35: Unable to register NAND device\n");
+	int err = gpmc_nand_init(&cm_t35_nand_data);
+
+	if (err)
+		pr_err("CM-T3x: unable to register NAND device: %d\n", err);
 }
 #else
 static inline void cm_t35_init_nand(void) {}
@@ -261,7 +263,7 @@ static int dvi_enabled;
 static int cm_t35_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
 	if (dvi_enabled) {
-		printk(KERN_ERR "cannot enable LCD, DVI is enabled\n");
+		pr_err("CM-T3x: cannot enable LCD, DVI is enabled\n");
 		return -EINVAL;
 	}
 
@@ -284,12 +286,12 @@ static void cm_t35_panel_disable_lcd(struct omap_dss_device *dssdev)
 static int cm_t35_panel_enable_dvi(struct omap_dss_device *dssdev)
 {
 	if (baseboard_is_cb_t3) {
-		printk(KERN_ERR "CB-T3 base board does not support DVI\n");
+		pr_err("CM-T3x: CB-T3 base board does not support DVI\n");
 		return -EINVAL;
 	}
 
 	if (lcd_enabled) {
-		printk(KERN_ERR "cannot enable DVI, LCD is enabled\n");
+		pr_err("CM-T3x: cannot enable DVI, LCD is enabled\n");
 		return -EINVAL;
 	}
 
@@ -309,7 +311,7 @@ static void cm_t35_panel_disable_dvi(struct omap_dss_device *dssdev)
 	 * and let the DSS state change.
 	 */
 	if (baseboard_is_cb_t3)
-		printk(KERN_WARNING "CB-T3 base board does not support DVI\n");
+		pr_warn("CM-T3x: CB-T3 base board does not support DVI\n");
 
 	if (gpio_is_valid(dvi_en_gpio))
 		gpio_set_value(dvi_en_gpio, 1);
@@ -410,7 +412,7 @@ static void __init cm_t35_init_display(void)
 	err = gpio_request_array(cm_t35_dss_gpios,
 				 ARRAY_SIZE(cm_t35_dss_gpios));
 	if (err) {
-		pr_err("CM-T35: failed to request DSS control GPIOs\n");
+		pr_err("CM-T3x: DSS control GPIOs request failed: %d\n", err);
 		return;
 	}
 
@@ -422,7 +424,7 @@ static void __init cm_t35_init_display(void)
 
 	err = omap_display_init(&cm_t35_dss_data);
 	if (err) {
-		pr_err("CM-T35: failed to register DSS device\n");
+		pr_err("CM-T3x: failed to register DSS device: %d\n", err);
 		gpio_free_array(cm_t35_dss_gpios, ARRAY_SIZE(cm_t35_dss_gpios));
 	}
 }
@@ -692,7 +694,7 @@ static void __init cm_t35_init_charge(void)
 
 	err = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, reg_val, BB_CFG_REG);
 	if (err)
-		pr_err("Backup Battery charger init failed: %d\n", err);
+		pr_err("CM-T3x: backup battery charger init failed: %d\n", err);
 }
 
 static int cm_t3x_twl_gpio_setup(unsigned gpio)
@@ -772,7 +774,7 @@ static int eeprom_read(struct memory_accessor *mem_acc, unsigned char *buf,
 
 	ret = mem_acc->read(mem_acc, buf, offset, size);
 	if (ret != size) {
-		pr_warning("CM-T3x: failed to read %s from EEPROM\n", objname);
+		pr_warn("CM-T3x: EEPROM %s read failed: %d\n", objname, ret);
 		return ret;
 	}
 
@@ -855,7 +857,7 @@ static void sb_t35_init(struct memory_accessor *mem_acc)
 
 	err = gpio_request_one(CM_T35_DVI_EN_GPIO, dvi_en_gpio_flags, "dvi en");
 	if (err) {
-		printk(KERN_ERR "CM-T35: failed to get DVI reset GPIO\n");
+		pr_err("CM-T3x: DVI reset GPIO request failed: %d\n", err);
 		return;
 	}
 	gpio_export(CM_T35_DVI_EN_GPIO, 0);
@@ -926,7 +928,7 @@ static void mt9t001_i2c_evalboard_setup(struct i2c_client *client)
 				I2C_SMBUS_WRITE, CAM_PCA9543APW_CTLREG,
 				I2C_SMBUS_BYTE_DATA, &val);
 	if (err)
-		pr_err("CM-T35: Failed to set camera muxer: %d\n", err);
+		pr_err("CM-T3x: failed to set camera muxer: %d\n", err);
 }
 
 static struct mt9t001_platform_data cm_t35_mt9t001_pdata = {
@@ -1001,8 +1003,10 @@ static struct isp_platform_data cm_t35_isp_pdata = {
 
 static void __init cm_t35_init_camera(void)
 {
-	if (omap3_init_camera(&cm_t35_isp_pdata) < 0)
-		pr_warning("CM-T35: Failed registering camera device!\n");
+	int err = omap3_init_camera(&cm_t35_isp_pdata);
+
+	if (err)
+		pr_warn("CM-T3x: failed registering camera device: %d\n", err);
 }
 
 #else
@@ -1015,11 +1019,11 @@ static void __init cm_t35_init_i2c(void)
 
 	err = platform_device_register(&cm_t35_madc_hwmon);
 	if (err)
-		pr_err("CM-T35: failed registering MADC HWMON: %d\n", err);
+		pr_err("CM-T3x: failed registering MADC HWMON: %d\n", err);
 
 	err = i2c_register_board_info(1, &cm_t35_i2c1_eeprom_info, 1);
 	if (err)
-		pr_err("CM-T35: failed registering EEPROM: %d\n", err);
+		pr_err("CM-T3x: failed registering EEPROM: %d\n", err);
 
 	omap_pmic_init(1, 400, "tps65930", INT_34XX_SYS_NIRQ, &cm_t35_twldata);
 
@@ -1035,8 +1039,7 @@ static void __init cm_t3730_opp_enable(const char *hwmod_name,
 
 	hwmod = omap_hwmod_lookup(hwmod_name);
 	if (!hwmod) {
-		pr_err("%s: can't find %s hwmod: %p\n",
-		       __func__, hwmod_name, hwmod);
+		pr_err("CM-T3x: can't find %s hwmod: %p\n", hwmod_name, hwmod);
 		return;
 	}
 
@@ -1045,8 +1048,8 @@ static void __init cm_t3730_opp_enable(const char *hwmod_name,
 	for (i = 0; freqs[i]; i++) {
 		err = opp_enable(dev, freqs[i]);
 		if (err) {
-			pr_err("%s: failed enabling %s %luMHz: %d\n",
-			       __func__, hwmod_name, freqs[i], err);
+			pr_err("CM-T3x: failed enabling %s %luMHz: %d\n",
+			       hwmod_name, freqs[i], err);
 			return;
 		}
 	}
@@ -1066,8 +1069,10 @@ static void __init cm_t3730_opp_init(void)
 
 static void __init cm_t3x_init_opp(void)
 {
-	if (omap3_opp_init())
-		pr_err("%s: opp default init failed\n", __func__);
+	int err = omap3_opp_init();
+
+	if (err)
+		pr_err("CM-T3x: opp default init failed: %d\n", err);
 }
 
 static void __init cm_t35_init_early(void)

@@ -74,6 +74,9 @@
 #define CB_T3_GP_LED_GPIO		162
 #define CB_T3_nCHRGR_EN_GPIO		164
 
+static int baseboard_is_cb_t3;
+static int dvi_en_gpio = -EINVAL;
+
 #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
 #include <linux/smsc911x.h>
 #include <plat/gpmc-smsc911x.h>
@@ -280,12 +283,19 @@ static void cm_t35_panel_disable_lcd(struct omap_dss_device *dssdev)
 
 static int cm_t35_panel_enable_dvi(struct omap_dss_device *dssdev)
 {
+	if (baseboard_is_cb_t3) {
+		printk(KERN_ERR "CB-T3 base board does not support DVI\n");
+		return -EINVAL;
+	}
+
 	if (lcd_enabled) {
 		printk(KERN_ERR "cannot enable DVI, LCD is enabled\n");
 		return -EINVAL;
 	}
 
-	gpio_set_value(CM_T35_DVI_EN_GPIO, 0);
+	if (gpio_is_valid(dvi_en_gpio))
+		gpio_set_value(dvi_en_gpio, 0);
+
 	dvi_enabled = 1;
 
 	return 0;
@@ -293,7 +303,17 @@ static int cm_t35_panel_enable_dvi(struct omap_dss_device *dssdev)
 
 static void cm_t35_panel_disable_dvi(struct omap_dss_device *dssdev)
 {
-	gpio_set_value(CM_T35_DVI_EN_GPIO, 1);
+	/*
+	 * Even if we are running on cb-t3, we let the disable code through,
+	 * so on any conditions there will be a possibility to disable the DVI
+	 * and let the DSS state change.
+	 */
+	if (baseboard_is_cb_t3)
+		printk(KERN_WARNING "CB-T3 base board does not support DVI\n");
+
+	if (gpio_is_valid(dvi_en_gpio))
+		gpio_set_value(dvi_en_gpio, 1);
+
 	dvi_enabled = 0;
 }
 
@@ -378,7 +398,6 @@ static struct spi_board_info cm_t35_lcd_spi_board_info[] __initdata = {
 static struct gpio cm_t35_dss_gpios[] __initdata = {
 	{ CM_T35_LCD_EN_GPIO, GPIOF_OUT_INIT_LOW,  "lcd enable"    },
 	{ CM_T35_LCD_BL_GPIO, GPIOF_OUT_INIT_LOW,  "lcd bl enable" },
-	{ CM_T35_DVI_EN_GPIO, GPIOF_OUT_INIT_HIGH, "dvi enable"    },
 };
 
 static void __init cm_t35_init_display(void)
@@ -397,7 +416,6 @@ static void __init cm_t35_init_display(void)
 
 	gpio_export(CM_T35_LCD_EN_GPIO, 0);
 	gpio_export(CM_T35_LCD_BL_GPIO, 0);
-	gpio_export(CM_T35_DVI_EN_GPIO, 0);
 
 	msleep(50);
 	gpio_set_value(CM_T35_LCD_EN_GPIO, 1);
@@ -826,10 +844,22 @@ static void sb_t35_init_mux(void)
 static void sb_t35_init(struct memory_accessor *mem_acc)
 {
 	unsigned char mac[ETH_ALEN];
+	int dvi_en_gpio_flags = GPIOF_OUT_INIT_HIGH, err;
 
 	sb_t35_init_mux();
 	eeprom_read_mac_address(mem_acc, mac);
 	sb_t35_init_ethernet(mac);
+
+	if (dvi_enabled)
+		dvi_en_gpio_flags = GPIOF_OUT_INIT_LOW;
+
+	err = gpio_request_one(CM_T35_DVI_EN_GPIO, dvi_en_gpio_flags, "dvi en");
+	if (err) {
+		printk(KERN_ERR "CM-T35: failed to get DVI reset GPIO\n");
+		return;
+	}
+	gpio_export(CM_T35_DVI_EN_GPIO, 0);
+	dvi_en_gpio = CM_T35_DVI_EN_GPIO;
 }
 
 static void cb_t3_init_mux(void)
@@ -851,6 +881,7 @@ static void cb_t3_init_mux(void)
 
 static void cb_t3_init(void)
 {
+	baseboard_is_cb_t3 = 1;
 	cb_t3_init_mux();
 	cb_t3_init_led();
 }

@@ -28,6 +28,7 @@
 
 #include <linux/i2c/at24.h>
 #include <linux/i2c/twl.h>
+#include <linux/ds2782_battery.h>
 #include <linux/regulator/fixed.h>
 #include <linux/regulator/machine.h>
 #include <linux/mmc/host.h>
@@ -906,9 +907,20 @@ static struct at24_platform_data baseboard_eeprom_pdata = {
 	.setup          = baseboard_eeprom_setup,
 };
 
-static struct i2c_board_info cm_t35_i2c3_eeprom_info __initdata = {
-	I2C_BOARD_INFO("at24", 0x50),
-	.platform_data = &baseboard_eeprom_pdata,
+#define DS2786_RSNS	18 /* Constant sense resistor value */
+struct ds278x_platform_data cm_t35_ds278x_pdata = {
+	.rsns = DS2786_RSNS,
+};
+
+static struct i2c_board_info cm_t35_i2c3_boardinfo[] __initdata = {
+	{
+		I2C_BOARD_INFO("at24", 0x50),
+		.platform_data = &baseboard_eeprom_pdata,
+	},
+	{
+		I2C_BOARD_INFO("ds2786", 0x36),
+		.platform_data = &cm_t35_ds278x_pdata,
+	},
 };
 
 #if defined(CONFIG_VIDEO_OMAP3) || defined(CONFIG_VIDEO_OMAP3_MODULE)
@@ -1027,7 +1039,8 @@ static void __init cm_t35_init_i2c(void)
 
 	omap_pmic_init(1, 400, "tps65930", INT_34XX_SYS_NIRQ, &cm_t35_twldata);
 
-	omap_register_i2c_bus(3, 400, &cm_t35_i2c3_eeprom_info, 1);
+	omap_register_i2c_bus(3, 400, cm_t35_i2c3_boardinfo,
+			      ARRAY_SIZE(cm_t35_i2c3_boardinfo));
 }
 
 static void __init cm_t3730_opp_enable(const char *hwmod_name,

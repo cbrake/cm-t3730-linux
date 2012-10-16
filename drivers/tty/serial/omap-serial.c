@@ -315,6 +315,28 @@ static void serial_omap_start_tx(struct uart_port *port)
 	omap_start_dma(up->uart_dma.tx_dma_channel);
 }
 
+static void serial_omap_throttle(struct uart_port *port)
+{
+	struct uart_omap_port *up = (struct uart_omap_port *)port;
+	unsigned long flags;
+
+	spin_lock_irqsave(&up->port.lock, flags);
+	up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
+	serial_out(up, UART_IER, up->ier);
+	spin_unlock_irqrestore(&up->port.lock, flags);
+}
+
+static void serial_omap_unthrottle(struct uart_port *port)
+{
+	struct uart_omap_port *up = (struct uart_omap_port *)port;
+	unsigned long flags;
+
+	spin_lock_irqsave(&up->port.lock, flags);
+	up->ier |= UART_IER_RLSI | UART_IER_RDI;
+	serial_out(up, UART_IER, up->ier);
+	spin_unlock_irqrestore(&up->port.lock, flags);
+}
+
 static unsigned int check_modem_status(struct uart_omap_port *up)
 {
 	unsigned int status;
@@ -859,6 +881,7 @@ static void serial_omap_config_port(struct uart_port *port, int flags)
 	dev_dbg(up->port.dev, "serial_omap_config_port+%d\n",
 							up->pdev->id);
 	up->port.type = PORT_OMAP;
+	up->port.flags |= UPF_SOFT_FLOW | UPF_HARD_FLOW;
 }
 
 static int
@@ -1044,6 +1067,8 @@ static struct uart_ops serial_omap_pops = {
 	.get_mctrl	= serial_omap_get_mctrl,
 	.stop_tx	= serial_omap_stop_tx,
 	.start_tx	= serial_omap_start_tx,
+	.throttle	= serial_omap_throttle,
+	.unthrottle	= serial_omap_unthrottle,
 	.stop_rx	= serial_omap_stop_rx,
 	.enable_ms	= serial_omap_enable_ms,
 	.break_ctl	= serial_omap_break_ctl,

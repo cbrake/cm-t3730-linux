@@ -419,7 +419,7 @@ static unsigned int serial_omap_get_mctrl(struct uart_port *port)
 static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
-	unsigned char mcr = 0;
+	unsigned char mcr = 0, old_mcr;
 
 	dev_dbg(up->port.dev, "serial_omap_set_mctrl+%d\n", up->pdev->id);
 	if (mctrl & TIOCM_RTS)
@@ -433,8 +433,11 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
 	if (mctrl & TIOCM_LOOP)
 		mcr |= UART_MCR_LOOP;
 
-	mcr |= up->mcr;
-	serial_out(up, UART_MCR, mcr);
+	old_mcr = serial_in(up, UART_MCR);
+	old_mcr &= ~(UART_MCR_LOOP | UART_MCR_OUT2 | UART_MCR_OUT1 |
+		     UART_MCR_DTR | UART_MCR_RTS);
+	up->mcr = old_mcr | mcr;
+	serial_out(up, UART_MCR, up->mcr);
 }
 
 static void serial_omap_break_ctl(struct uart_port *port, int break_state)

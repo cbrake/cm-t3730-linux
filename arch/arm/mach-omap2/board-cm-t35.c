@@ -676,9 +676,56 @@ static void cm_t3730_init_wlan(unsigned gpio)
 gpio_free:
 	gpio_free_array(cm_t3730_wlan_gpios, ARRAY_SIZE(cm_t3730_wlan_gpios));
 }
+
+#if defined(CONFIG_BT_HCIUART) || defined(CONFIG_BT_HCIUART_MODULE)
+#define CM_T3730_BT_RESETX_GPIO		71
+#define CM_T3730_BT_WAKEUP_GPIO		72
+
+static struct gpio cm_t3730_bt_gpios[] = {
+	{ CM_T3730_BT_RESETX_GPIO, GPIOF_OUT_INIT_LOW, "bt resetx" },
+	{ CM_T3730_BT_WAKEUP_GPIO, GPIOF_OUT_INIT_HIGH,  "bt wakeup" },
+};
+
+static void cm_t3730_init_bt_mux(void)
+{
+	int mux_mode = OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT;
+
+	omap_mux_init_gpio(CM_T3730_BT_RESETX_GPIO, mux_mode);
+	omap_mux_init_gpio(CM_T3730_BT_WAKEUP_GPIO, mux_mode);
+
+	mux_mode = OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT;
+	omap_mux_init_signal("mcbsp3_dr.uart2_rts", mux_mode);
+	omap_mux_init_signal("mcbsp3_clkx.uart2_tx", mux_mode);
+	omap_mux_init_signal("mcbsp3_dx.uart2_cts",
+			     OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN);
+	omap_mux_init_signal("mcbsp3_fsx.uart2_rx",
+			     OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLUP);
+}
+
+static void cm_t3730_init_bt(void)
+{
+	int err;
+
+	err = gpio_request_array(cm_t3730_bt_gpios,
+				 ARRAY_SIZE(cm_t3730_bt_gpios));
+	if (err) {
+		pr_err("CM-T3730: BT reset gpio request failed: %d\n", err);
+		return;
+	}
+	gpio_export(CM_T3730_BT_RESETX_GPIO, 0);
+
+	udelay(100);
+	gpio_set_value(CM_T3730_BT_RESETX_GPIO, 1);
+}
+#else
+static inline void cm_t3730_init_bt_mux(void) {}
+static inline void cm_t3730_init_bt(void) {}
+#endif /* CONFIG_BT_HCIUART */
 #else
 static inline void cm_t3730_init_wlan_mux(void) {}
 static inline void cm_t3730_init_wlan(unsigned gpio) {}
+static inline void cm_t3730_init_bt_mux(void) {}
+static inline void cm_t3730_init_bt(void) {}
 #endif /* CONFIG_WL12XX_SDIO */
 
 /* Backup Battery config register */
@@ -720,6 +767,9 @@ static int cm_t3730_twl_gpio_setup(struct device *dev, unsigned gpio,
 				   unsigned ngpio)
 {
 	cm_t3730_init_wlan(gpio + 2);
+	/* wait for the chip power to stabilize */
+	msleep(100);
+	cm_t3730_init_bt();
 	return cm_t3x_twl_gpio_setup(gpio);
 }
 
@@ -1290,6 +1340,7 @@ static void __init cm_t3730_init(void)
 	} else {
 		cm_t35_gpio_data.setup = cm_t3730_twl_gpio_setup;
 		cm_t3730_init_wlan_mux();
+		cm_t3730_init_bt_mux();
 	}
 }
 

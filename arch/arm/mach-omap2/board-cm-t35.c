@@ -40,6 +40,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
+#include <plat/cpu.h>
 #include <plat/board.h>
 #include <plat/common.h>
 #include <plat/nand.h>
@@ -1127,7 +1128,8 @@ static void __init cm_t3730_opp_init(void)
 
 	/* TODO: MPU 1GHz needs ABB */
 	cm_t3730_opp_enable("mpu", mpu_freqs);
-	cm_t3730_opp_enable("iva", iva_freqs);
+	if (omap3_has_iva())
+		cm_t3730_opp_enable("iva", iva_freqs);
 }
 
 static void __init cm_t3x_init_opp(void)

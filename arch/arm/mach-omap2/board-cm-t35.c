@@ -778,6 +778,7 @@ static struct twl4030_gpio_platform_data cm_t35_gpio_data = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
 	.irq_end	= TWL4030_GPIO_IRQ_END,
+	.pullups	= 0x1,
 };
 
 static struct twl4030_codec_audio_data cm_t35_audio_data;

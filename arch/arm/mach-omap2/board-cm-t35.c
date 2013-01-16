@@ -61,6 +61,87 @@
 #include "devices.h"
 #include "pm.h"
 
+/*
+ *************************************************************************
+ * DUGen2 specific features
+ *************************************************************************
+ */
+
+#define DU_LCD_SHUTDOWN_N		74
+#define DU_DVI_PDn			10
+
+static int du_panel_enable_lcd(struct omap_dss_device *dssdev)
+{
+
+	gpio_set_value(DU_LCD_SHUTDOWN_N, 1);
+	return 0;
+}
+
+static void du_panel_disable_lcd(struct omap_dss_device *dssdev)
+{
+	gpio_set_value(DU_LCD_SHUTDOWN_N, 0);
+}
+
+static struct panel_generic_dpi_data du_lcd_panel = {
+.name			= "generic",
+.platform_enable	= du_panel_enable_lcd,
+.platform_disable	= du_panel_disable_lcd,
+};
+
+static struct omap_dss_device du_lcd_device = {
+.name			= "lcd",
+.type			= OMAP_DISPLAY_TYPE_DPI,
+.driver_name		= "generic_dpi_panel",
+.data			= &du_lcd_panel,
+.phy.dpi.data_lines	= 18,
+};
+
+static struct omap_dss_device *du_dss_devices[] = {
+	&du_lcd_device,
+};
+
+static struct omap_dss_board_info du_dss_data = {
+	.num_devices	= ARRAY_SIZE(du_dss_devices),
+	.devices	= du_dss_devices,
+	.default_device	= &du_lcd_device,
+};
+
+static struct gpio du_dss_gpios[] __initdata = {
+	{ DU_LCD_SHUTDOWN_N, GPIOF_OUT_INIT_LOW,  "lcd enable"    },
+	{ DU_DVI_PDn, GPIOF_OUT_INIT_LOW,  "dvi enable" },
+};
+
+static void __init du_init_display(void)
+{
+	int err;
+
+	printk("DU: init display\n");
+
+	err = gpio_request_array(du_dss_gpios,
+				 ARRAY_SIZE(du_dss_gpios));
+	if (err) {
+		pr_err("DU: DSS control GPIOs request failed: %d\n", err);
+		return;
+	}
+
+	gpio_export(DU_LCD_SHUTDOWN_N, 0);
+	gpio_export(DU_DVI_PDn, 0);
+
+	err = omap_display_init(&du_dss_data);
+	if (err) {
+		pr_err("DU: failed to register DSS device: %d\n", err);
+		gpio_free_array(du_dss_gpios, ARRAY_SIZE(du_dss_gpios));
+	}
+}
+
+
+/*
+ *************************************************************************
+ * end DUGen2 Specific code
+ *************************************************************************
+ */
+
+
 #define CM_T35_GPIO_PENDOWN		57
 #define CM_T35_SMSC911X_CS		5
 #define CM_T35_SMSC911X_GPIO		163
@@ -1317,7 +1398,8 @@ static void __init cm_t3x_common_init(void)
 	cm_t35_init_i2c();
 	cm_t35_init_touchscreen();
 	cm_t35_init_led();
-	cm_t35_init_display();
+	//cm_t35_init_display();
+	du_init_display();
 	cm_t35_init_nand();
 
 	usb_musb_init(NULL);

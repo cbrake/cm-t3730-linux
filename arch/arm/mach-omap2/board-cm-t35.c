@@ -67,19 +67,20 @@
  *************************************************************************
  */
 
-#define DU_LCD_SHUTDOWN_N		74
-#define DU_DVI_PDn			10
+#define DU_GPIO_LCD_SHUTDOWN_N		74
+#define DU_GPIO_DVI_PDn			10
+#define DU_GPIO_AUDIO_SD_N		109
 
 static int du_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
 
-	gpio_set_value(DU_LCD_SHUTDOWN_N, 1);
+	gpio_set_value(DU_GPIO_LCD_SHUTDOWN_N, 1);
 	return 0;
 }
 
 static void du_panel_disable_lcd(struct omap_dss_device *dssdev)
 {
-	gpio_set_value(DU_LCD_SHUTDOWN_N, 0);
+	gpio_set_value(DU_GPIO_LCD_SHUTDOWN_N, 0);
 }
 
 static struct panel_generic_dpi_data du_lcd_panel = {
@@ -106,32 +107,42 @@ static struct omap_dss_board_info du_dss_data = {
 	.default_device	= &du_lcd_device,
 };
 
-static struct gpio du_dss_gpios[] __initdata = {
-	{ DU_LCD_SHUTDOWN_N, GPIOF_OUT_INIT_LOW,  "lcd enable"    },
-	{ DU_DVI_PDn, GPIOF_OUT_INIT_LOW,  "dvi enable" },
-};
-
 static void __init du_init_display(void)
 {
 	int err;
 
 	printk("DU: init display\n");
 
-	err = gpio_request_array(du_dss_gpios,
-				 ARRAY_SIZE(du_dss_gpios));
-	if (err) {
-		pr_err("DU: DSS control GPIOs request failed: %d\n", err);
-		return;
-	}
-
-	gpio_export(DU_LCD_SHUTDOWN_N, 0);
-	gpio_export(DU_DVI_PDn, 0);
 
 	err = omap_display_init(&du_dss_data);
 	if (err) {
 		pr_err("DU: failed to register DSS device: %d\n", err);
-		gpio_free_array(du_dss_gpios, ARRAY_SIZE(du_dss_gpios));
 	}
+}
+
+static struct gpio du_gpios[] __initdata = {
+	{ DU_GPIO_LCD_SHUTDOWN_N, GPIOF_OUT_INIT_LOW,  "lcd enable"    },
+	{ DU_GPIO_DVI_PDn, GPIOF_OUT_INIT_LOW,  "dvi enable" },
+	{ DU_GPIO_AUDIO_SD_N, GPIOF_OUT_INIT_HIGH, "Audio Shutdown n" },
+};
+
+static void __init du_init(void)
+{
+	int err;
+
+	err = gpio_request_array(du_gpios,
+				 ARRAY_SIZE(du_gpios));
+	if (err) {
+		pr_err("DU: GPIOs request failed: %d\n", err);
+		gpio_free_array(du_gpios, ARRAY_SIZE(du_gpios));
+		return;
+	}
+
+	gpio_export(DU_GPIO_LCD_SHUTDOWN_N, 0);
+	gpio_export(DU_GPIO_DVI_PDn, 0);
+	gpio_export(DU_GPIO_AUDIO_SD_N, 0);
+
+	du_init_display();
 }
 
 
@@ -1399,7 +1410,7 @@ static void __init cm_t3x_common_init(void)
 	cm_t35_init_touchscreen();
 	cm_t35_init_led();
 	//cm_t35_init_display();
-	du_init_display();
+	du_init();
 	cm_t35_init_nand();
 
 	usb_musb_init(NULL);

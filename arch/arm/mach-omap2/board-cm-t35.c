@@ -67,9 +67,13 @@
  *************************************************************************
  */
 
+#include <linux/serial_8250.h>
+
 #define DU_GPIO_LCD_SHUTDOWN_N		74
 #define DU_GPIO_DVI_PDn			10
 #define DU_GPIO_AUDIO_SD_N		109
+#define DU_GPIO_GPMC_OE			159
+#define DU_GPIO_8T245_OE_N		59
 
 static int du_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
@@ -94,7 +98,7 @@ static struct omap_dss_device du_lcd_device = {
 .type			= OMAP_DISPLAY_TYPE_DPI,
 .driver_name		= "generic_dpi_panel",
 .data			= &du_lcd_panel,
-.phy.dpi.data_lines	= 18,
+.phy.dpi.data_lines	= 24,
 };
 
 static struct omap_dss_device *du_dss_devices[] = {
@@ -106,6 +110,120 @@ static struct omap_dss_board_info du_dss_data = {
 	.devices	= du_dss_devices,
 	.default_device	= &du_lcd_device,
 };
+
+#define DU_UART_CS_A	3
+#define DU_UART_CS_B	4
+#define DU_UART_CS_C_D	7
+#define DU_UART_A_IRQ	162
+#define DU_UART_B_IRQ	161
+#define DU_UART_C_IRQ	156
+#define DU_UART_D_IRQ	31
+
+static struct plat_serial8250_port du_uart_platform_data[] = {
+	{
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_BUGGY_UART,
+		.irqflags	= IRQF_TRIGGER_RISING,
+		.iotype		= UPIO_MEM,
+		.regshift	= 1,
+		.uartclk	= 18432000,
+	}, 
+	{
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_BUGGY_UART,
+		.irqflags	= IRQF_TRIGGER_RISING,
+		.iotype		= UPIO_MEM,
+		.regshift	= 1,
+		.uartclk	= 18432000,
+	},
+	{
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_BUGGY_UART,
+		.irqflags	= IRQF_TRIGGER_RISING,
+		.iotype		= UPIO_MEM,
+		.regshift	= 1,
+		.uartclk	= 18432000,
+	},
+	{
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_BUGGY_UART,
+		.irqflags	= IRQF_TRIGGER_RISING,
+		.iotype		= UPIO_MEM,
+		.regshift	= 1,
+		.uartclk	= 18432000,
+	},
+	{}
+};
+
+static struct platform_device du_uart_device =
+{
+	.name			= "serial8250",
+	.id				= PLAT8250_DEV_PLATFORM,
+	.dev			= {
+			.platform_data	= du_uart_platform_data,
+		},
+};
+
+static void __init du_init_uart(void)
+{
+	unsigned long cs_base;
+
+	/* fetch chip selects */
+	if (gpmc_cs_request(DU_UART_CS_A, SZ_16M, &cs_base) < 0)
+	{
+		printk(KERN_ERR "Failed to request GPMC mem CS%d\n", DU_UART_CS_A);
+		return;
+	}
+	du_uart_platform_data[0].mapbase = cs_base;
+	printk("DU: UART A base address = 0x%x\n", du_uart_platform_data[0].mapbase);
+
+	if (gpmc_cs_request(DU_UART_CS_B, SZ_16M, &cs_base) < 0)
+	{
+		printk(KERN_ERR "Failed to request GPMC mem CS%d\n", DU_UART_CS_B);
+		return;
+	}
+	du_uart_platform_data[1].mapbase = cs_base;
+	printk("DU: UART B base address = 0x%x\n", du_uart_platform_data[1].mapbase);
+
+	if (gpmc_cs_request(DU_UART_CS_C_D, SZ_16M, &cs_base) < 0)
+	{
+		printk(KERN_ERR "Failed to request GPMC mem CS%d\n", DU_UART_CS_C_D);
+		return;
+	}
+	du_uart_platform_data[2].mapbase = cs_base;
+	printk("DU: UART C base address = 0x%x\n", du_uart_platform_data[2].mapbase);
+	du_uart_platform_data[3].mapbase = cs_base + 0x400;
+	printk("DU: UART D base address = 0x%x\n", du_uart_platform_data[3].mapbase);
+
+	/* fetch irqs */
+	if (gpio_request_one(DU_UART_A_IRQ, GPIOF_IN, "DU UART IRQ port A") < 0)
+	{
+		printk(KERN_ERR "Failed to request GPIO%d for DU UART IRQ\n",
+				DU_UART_A_IRQ);
+		return;
+	}
+	du_uart_platform_data[0].irq = gpio_to_irq(DU_UART_A_IRQ);
+
+	if (gpio_request_one(DU_UART_B_IRQ, GPIOF_IN, "DU UART IRQ port A") < 0)
+	{
+		printk(KERN_ERR "Failed to request GPIO%d for DU UART IRQ\n",
+				DU_UART_B_IRQ);
+		return;
+	}
+	du_uart_platform_data[1].irq = gpio_to_irq(DU_UART_B_IRQ);
+
+	if (gpio_request_one(DU_UART_C_IRQ, GPIOF_IN, "DU UART IRQ port A") < 0)
+	{
+		printk(KERN_ERR "Failed to request GPIO%d for DU UART IRQ\n",
+				DU_UART_C_IRQ);
+		return;
+	}
+	du_uart_platform_data[2].irq = gpio_to_irq(DU_UART_C_IRQ);
+	
+	if (gpio_request_one(DU_UART_D_IRQ, GPIOF_IN, "DU UART IRQ port A") < 0)
+	{
+		printk(KERN_ERR "Failed to request GPIO%d for DU UART IRQ\n",
+				DU_UART_D_IRQ);
+		return;
+	}
+	du_uart_platform_data[3].irq = gpio_to_irq(DU_UART_D_IRQ);
+}
 
 static void __init du_init_display(void)
 {
@@ -124,6 +242,12 @@ static struct gpio du_gpios[] __initdata = {
 	{ DU_GPIO_LCD_SHUTDOWN_N, GPIOF_OUT_INIT_LOW,  "lcd enable"    },
 	{ DU_GPIO_DVI_PDn, GPIOF_OUT_INIT_LOW,  "dvi enable" },
 	{ DU_GPIO_AUDIO_SD_N, GPIOF_OUT_INIT_HIGH, "Audio Shutdown n" },
+	{ DU_GPIO_GPMC_OE, GPIOF_OUT_INIT_HIGH, "UART Buffer Enable" },
+	{ DU_GPIO_8T245_OE_N, GPIOF_OUT_INIT_LOW, "UART Buffer Enable 2" },
+};
+
+static struct platform_device *du_devices[] __initdata = {
+	&du_uart_device,
 };
 
 static void __init du_init(void)
@@ -143,6 +267,9 @@ static void __init du_init(void)
 	gpio_export(DU_GPIO_AUDIO_SD_N, 0);
 
 	du_init_display();
+	du_init_uart();
+
+	platform_add_devices(du_devices, ARRAY_SIZE(du_devices));
 }
 
 
@@ -1183,8 +1310,10 @@ static void __init cm_t35_init_i2c(void)
 
 	omap_pmic_init(1, 400, "tps65930", INT_34XX_SYS_NIRQ, &cm_t35_twldata);
 
+	/*
 	omap_register_i2c_bus(3, 400, cm_t35_i2c3_boardinfo,
 			      ARRAY_SIZE(cm_t35_i2c3_boardinfo));
+			      */
 }
 
 static void __init cm_t3730_opp_enable(const char *hwmod_name,
@@ -1243,8 +1372,8 @@ static void __init cm_t35_init_early(void)
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	/* nCS and IRQ for CM-T35 ethernet */
-	OMAP3_MUX(GPMC_NCS5, OMAP_MUX_MODE0),
-	OMAP3_MUX(UART3_CTS_RCTX, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
+	//OMAP3_MUX(GPMC_NCS5, OMAP_MUX_MODE0),
+	//OMAP3_MUX(UART3_CTS_RCTX, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
 
 	/* PENDOWN GPIO */
 	OMAP3_MUX(GPMC_NCS6, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
@@ -1272,11 +1401,13 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP3_MUX(MCSPI1_SOMI, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
 	OMAP3_MUX(MCSPI1_CS0, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN),
 
+#if 0
 	/* McSPI 4 */
 	OMAP3_MUX(MCBSP1_CLKR, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
 	OMAP3_MUX(MCBSP1_DX, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
 	OMAP3_MUX(MCBSP1_DR, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
 	OMAP3_MUX(MCBSP1_FSX, OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLUP),
+#endif
 
 	/* McBSP 2 */
 	OMAP3_MUX(MCBSP2_FSX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
@@ -1329,10 +1460,12 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP3_MUX(CAM_D10, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN),
 	OMAP3_MUX(CAM_D11, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN),
 
+#if 0
 	/* display controls */
 	OMAP3_MUX(MCBSP1_FSR, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
 	OMAP3_MUX(GPMC_NCS7, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
 	OMAP3_MUX(GPMC_NCS3, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+#endif
 
 	/* TPS IRQ */
 	OMAP3_MUX(SYS_NIRQ, OMAP_MUX_MODE0 | OMAP_WAKEUP_EN | \
@@ -1411,7 +1544,7 @@ static void __init cm_t3x_common_init(void)
 	cm_t35_init_led();
 	//cm_t35_init_display();
 	du_init();
-	cm_t35_init_nand();
+	//cm_t35_init_nand();
 
 	usb_musb_init(NULL);
 	cm_t35_init_usbh();

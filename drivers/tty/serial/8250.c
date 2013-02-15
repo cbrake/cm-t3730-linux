@@ -38,6 +38,7 @@
 #include <linux/nmi.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/uaccess.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -47,6 +48,15 @@
 #ifdef CONFIG_SPARC
 #include "suncore.h"
 #endif
+
+/*
+ * Register for TI TL16CP75x RS485 mode support
+ */
+#define UART_AFR  2
+#define UART_AFR_485EN		(1<<2)
+#define UART_AFR_485LG		(1<<3)
+#define UART_AFR_DLY_SHIFT	5
+#define UART_AFR_DLY_MASK	(0x7 << UART_AFR_DLY_SHIFT)
 
 /*
  * Configuration:
@@ -153,6 +163,7 @@ struct uart_8250_port {
 	unsigned char		lsr_saved_flags;
 #define MSR_SAVE_FLAGS UART_MSR_ANY_DELTA
 	unsigned char		msr_saved_flags;
+	struct serial_rs485	rs485;
 };
 
 struct irq_info {
@@ -2736,6 +2747,60 @@ serial8250_verify_port(struct uart_port *port, struct serial_struct *ser)
 	return 0;
 }
 
+static int
+serial8250_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg)
+{
+	unsigned char saved_lcr, afr;
+	unsigned long flags;
+
+	struct serial_rs485 rs485conf;
+
+	struct uart_8250_port *up =
+		container_of(port, struct uart_8250_port, port);
+
+	switch (cmd) {
+	case TIOCSRS485:
+		if (copy_from_user(&rs485conf, (struct serial_rs485 *) arg,
+					sizeof(rs485conf)))
+			return -EFAULT;
+
+		spin_lock_irqsave(&up->port.lock, flags);
+		saved_lcr = serial_inp(up, UART_LCR);
+		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A); 
+		if (rs485conf.flags & SER_RS485_ENABLED) {
+			printk("ttyS%d: Enabling RS485 mode, delay after = %i bit times\n",
+					serial_index(&up->port),
+					rs485conf.delay_rts_after_send);
+			afr = serial_in(up, UART_AFR) & ~(UART_AFR_DLY_MASK);
+			afr |= UART_AFR_485EN|UART_AFR_485LG;
+			afr |= rs485conf.delay_rts_after_send << UART_AFR_DLY_SHIFT;
+			serial_out(up, UART_AFR, afr);
+		} else {
+			printk("ttyS%d: Disabling RS485 mode\n", serial_index(&up->port));
+			afr = serial_in(up, UART_AFR) & ~(UART_AFR_485EN|UART_AFR_485LG);
+			serial_out(up, UART_AFR, afr);
+		}
+		serial_out(up, UART_LCR, saved_lcr);
+		up->rs485.flags = rs485conf.flags & (SER_RS485_ENABLED|SER_RS485_RTS_ON_SEND|
+				SER_RS485_RTS_AFTER_SEND);
+		up->rs485.delay_rts_before_send = 0;
+		up->rs485.delay_rts_after_send = rs485conf.delay_rts_after_send;
+		spin_unlock_irqrestore(&up->port.lock, flags);
+		break;
+
+	case TIOCGRS485:
+		if (copy_to_user((struct serial_rs485 *) arg,
+					&up->rs485,
+					sizeof(rs485conf)))
+			return -EFAULT;
+		break;
+
+	default:
+		return -ENOIOCTLCMD;
+	}
+	return 0;
+}
+
 static const char *
 serial8250_type(struct uart_port *port)
 {
@@ -2765,6 +2830,7 @@ static struct uart_ops serial8250_pops = {
 	.request_port	= serial8250_request_port,
 	.config_port	= serial8250_config_port,
 	.verify_port	= serial8250_verify_port,
+	.ioctl		= serial8250_ioctl,
 #ifdef CONFIG_CONSOLE_POLL
 	.poll_get_char = serial8250_get_poll_char,
 	.poll_put_char = serial8250_put_poll_char,

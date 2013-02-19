@@ -238,6 +238,19 @@ static void __init du_init_display(void)
 	}
 }
 
+static void __init du_init_i2c(void)
+{
+	int err;
+
+	err = omap_register_i2c_bus(2, 100, NULL, 0);
+	if (err)
+		pr_err("DU: failed to register I2C bus 2 %d\n", err);
+
+	err = omap_register_i2c_bus(3, 100, NULL, 0);
+	if (err)
+		pr_err("DU: failed to register I2C bus 3 %d\n", err);
+}
+
 static struct gpio du_gpios[] __initdata = {
 	{ DU_GPIO_LCD_SHUTDOWN_N, GPIOF_OUT_INIT_LOW,  "lcd enable"    },
 	{ DU_GPIO_DVI_PDn, GPIOF_OUT_INIT_LOW,  "dvi enable" },
@@ -1540,6 +1553,7 @@ static void __init cm_t3x_common_init(void)
 	omap_serial_init();
 	cm_t3x_init_opp();
 	cm_t35_init_i2c();
+	du_init_i2c();
 	cm_t35_init_touchscreen();
 	cm_t35_init_led();
 	//cm_t35_init_display();
